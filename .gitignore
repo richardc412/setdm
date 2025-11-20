@@ -12,7 +12,7 @@ ENV/
 !.env.sample
 
 # --- Python caches / artifacts (safe defaults) ---
-__pycache__/
+**__pycache__/
 *.py[cod]
 *.pyo
 *.pyd
