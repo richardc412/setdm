@@ -1,0 +1,179 @@
+---
+title: "Hackathon MVP Cursor Rules"
+version: 1.0
+---
+
+# Project: DM Autopilot for Fitness Coaches (Hackathon MVP)
+
+You are helping build a 3-day, production-intentional MVP for social media managers to automate DM handling for fitness coaches.
+Primary goal: ship a reliable end-to-end demo loop fast, with minimal architecture and high clarity.
+
+## North Star Demo Loop
+
+1. DM arrives via Unipile webhook
+2. Message stored in Postgres (idempotent)
+3. Conversation appears in UI
+4. Agent decides + optionally replies
+5. UI streams realtime events + agent activity
+6. Stage progresses toward booking a call
+
+If a change does not improve this loop, do not implement it.
+
+---
+
+# Stack (source of truth)
+
+Backend:
+
+- Python + FastAPI
+- Auth: FastAPI OAuth2 Password flow + JWT
+- Webhooks: Unipile
+- Broker: Redis Streams
+- Persistence: PostgreSQL + SQLAlchemy
+- Tasks: Celery + Redis broker/backend
+- LLM: OpenAI API
+- Realtime: Server-Sent Events (SSE)
+
+Frontend:
+
+- Next.js + TypeScript
+- Simple UI: conversation list, chat log, agent activity pane, stage/status controls
+
+---
+
+# Architecture Invariants (DO NOT break)
+
+1. **Postgres is the source of truth.** Redis is for streams + optional caching only.
+2. **Events are append-only.** No in-place mutation of past events.
+3. **At-least-once delivery assumed.** Consumers must be idempotent.
+4. **One conversation = one debounce lane.** Never send multiple overlapping agent replies.
+5. **Manual override always wins.** Human handoff toggle blocks agent sends.
+6. **Minimal abstractions.** Prefer direct code over frameworks or generic layers.
+
+---
+
+# Event Model (Redis Streams)
+
+## Stream name
+
+`events`
+
+## Required fields for each event
+
+- `type` (string)
+- `conversation_id` (string/uuid)
+- `account_id` (string/uuid)
+- `ts` (unix ms)
+- `payload` (json string)
+
+## Allowed event types (start here only)
+
+- `message.ingested`
+- `conversation.updated`
+- `agent.decision.requested`
+- `agent.decision.made`
+- `agent.reply.sent`
+- `handoff.toggled`
+
+Do NOT add new event types unless explicitly asked.
+
+---
+
+# Backend Conventions
+
+## FastAPI
+
+- One router per domain: `webhooks`, `conversations`, `agent`, `realtime`, `auth`
+- Use Pydantic models for request/response
+- Return explicit status codes
+- Log with structured fields
+
+## Celery
+
+- Tasks should be **small** and domain-named:
+  - `agent_process_conversation(conversation_id)`
+  - `send_platform_reply(conversation_id, text)`
+- Prefer delayed tasks for debounce over custom timers.
+
+## SSE
+
+- Endpoint: `/events/stream`
+- Client subscribes once; server emits JSON lines.
+- Heartbeat every ~15s.
+
+## Webhooks
+
+- Always verify signature if available.
+- Always idempotent via unique constraint.
+- Ingest flow:
+  1. Validate
+  2. Write message (ignore duplicates)
+  3. Update conversation last_message_at
+  4. XADD `message.ingested`
+
+---
+
+# Frontend Conventions
+
+- Keep components dumb; business logic stays backend.
+- Prefer server components for initial lists; client only for streaming + interactivity.
+- Minimal state management (React state + SWR/React Query if already in use).
+- UI surfaces:
+  - Conversation list
+  - Chat view
+  - Agent activity pane (event log)
+  - Stage + handoff controls
+
+---
+
+# Vibe-Coding Rules (how to generate code)
+
+You are a fast pair-programmer. Optimize for smallest working change.
+
+1. **Ask for smallest version first.**
+   - Happy path only unless asked for edge cases.
+2. **Return minimal diffs.**
+   - If editing, output a unified diff or only changed functions.
+3. **No refactors unless requested.**
+   - Don’t rename files or reorganize folders for “cleanliness.”
+4. **Explain before code for risky parts.**
+   - Brokers, auth, concurrency, retries, OpenAI calls.
+5. **Prefer boring solutions.**
+   - No fancy patterns, no new libraries unless clearly needed.
+6. **Keep functions short and explicit.**
+   - Readable by a human in 30 seconds.
+7. **Add lightweight docs/comments.**
+   - Docstrings on public functions + 1-line intent comments where logic isn’t obvious.
+8. **Idempotency everywhere.**
+   - Any consumer/handler can safely re-run.
+9. **Never invent APIs.**
+   - Only use libraries/endpoints that exist in this repo/stack.
+10. **Surface assumptions.**
+
+- If something is uncertain, state it in comments.
+
+---
+
+# Human Review Checklist (optimize code for this)
+
+When you write code, make it easy to verify these:
+
+- Does it preserve demo loop correctness?
+- Are there hidden async bugs (missing awaits, swallowed exceptions)?
+- Are retries/duplicates safe?
+- Is auth boundary clear?
+- Is any state duplicated between Redis and Postgres?
+- Are logs actionable?
+
+---
+
+# Output Style
+
+- Be concise.
+- Use code blocks only where needed.
+- When proposing changes, include:
+  1. intent (1–2 sentences)
+  2. patch/diff
+  3. quick sanity checks to run
+
+---
