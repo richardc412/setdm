@@ -21,6 +21,22 @@ uv sync
 `uv sync` installs the dependencies pinned in `pyproject.toml` and `uv.lock`.
 It downloads the wheels and keeps the local `.venv` aligned with the lockfile.
 
+## Configuration
+
+Environment variables are loaded from `/Users/idkdude/Desktop/setdm/backend/.env`
+via [`pydantic-settings`](https://docs.pydantic.dev/latest/concepts/pydantic_settings/).
+Create that file (it is git-ignored) and define any settings you need:
+
+```dotenv
+APP_NAME=Hackathon API
+ENVIRONMENT=local
+DEBUG=false
+```
+
+These values populate the `Settings` model in `app/config.py` and are available
+through FastAPI dependencies (for example, the `/health` endpoint reports the
+current environment and debug flag).
+
 ## Common commands
 
 - Show `uv` version: `uv --version`

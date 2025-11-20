@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 
-app = FastAPI(title="Hackathon API")
+app = FastAPI(title="SetDM API")
+
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    return {
+        "ok": True,
+    }
