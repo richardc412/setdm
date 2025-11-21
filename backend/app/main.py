@@ -69,9 +69,9 @@ async def lifespan(app: FastAPI):
         logger.info("Starting background scheduler for pending message processing...")
         scheduler.add_job(
             process_pending_messages,
-            trigger=IntervalTrigger(seconds=10),
+            trigger=IntervalTrigger(seconds=60),
             id="pending_message_processor",
-            name="Process pending messages every 10 seconds",
+            name="Process pending messages every 60 seconds",
             replace_existing=True,
         )
         scheduler.start()
