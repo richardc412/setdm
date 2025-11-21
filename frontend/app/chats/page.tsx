@@ -13,8 +13,10 @@ import {
   markChatAsRead,
   getChatAttendee,
   Attendee,
+  sendMessage,
 } from "@/lib/api";
 import { MessageList } from "@/components/MessageList";
+import { MessageInput } from "@/components/MessageInput";
 
 export default function ChatsPage() {
   const { user, logout } = useAuth();
@@ -144,6 +146,117 @@ export default function ChatsPage() {
         console.error("Failed to mark chat as read:", err);
         // Don't show error to user, this is a background operation
       }
+    }
+  };
+
+  const handleSendMessage = async (text: string, attachments: File[]) => {
+    if (!selectedChat) return;
+
+    try {
+      // Send message via Unipile API
+      const response = await sendMessage(selectedChat.id, {
+        text,
+        attachments: attachments.length > 0 ? attachments : undefined,
+      });
+
+      // Optimistically add the message to local state immediately (201 response)
+      const optimisticMessage: Message = {
+        object: "Message",
+        id: response.message_id || `temp-${Date.now()}`,
+        account_id: selectedChat.account_id,
+        chat_id: selectedChat.id,
+        chat_provider_id: selectedChat.provider_id,
+        provider_id: response.message_id || `temp-${Date.now()}`,
+        sender_id: "self",
+        sender_attendee_id: "self",
+        text: text || null,
+        timestamp: new Date().toISOString(),
+        is_sender: 1,
+        attachments:
+          attachments.length > 0
+            ? attachments.map((file) => ({
+                type: "file",
+                file_name: file.name,
+                file_size: file.size,
+                mimetype: file.type,
+              }))
+            : [],
+        reactions: [],
+        seen: 0,
+        seen_by: {},
+        hidden: 0,
+        deleted: 0,
+        edited: 0,
+        is_event: 0,
+        delivered: 1,
+        behavior: null,
+        original: text || "",
+      };
+
+      // Add message to local state
+      setMessages((prev) => [...prev, optimisticMessage]);
+
+      // Scroll to bottom to show the new message
+      setTimeout(() => {
+        const messagesContainer = document.getElementById("messages-container");
+        if (messagesContainer) {
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+      }, 100);
+
+      // Reload messages in background to sync with server
+      // Wait longer for backend sync to complete (it triggers immediately after send)
+      const sentMessageId = response.message_id;
+      setTimeout(async () => {
+        try {
+          const messagesResponse = await getChatMessages(selectedChat.id, {
+            limit: 100,
+            order_desc: false,
+          });
+
+          // Check if our sent message is in the synced messages
+          const hasOurMessage = messagesResponse.items.some(
+            (msg) =>
+              msg.id === sentMessageId ||
+              (msg.text === text &&
+                msg.is_sender === 1 &&
+                Math.abs(new Date(msg.timestamp).getTime() - Date.now()) <
+                  10000)
+          );
+
+          if (hasOurMessage) {
+            // Message is synced, replace with server data
+            setMessages(messagesResponse.items);
+          } else {
+            // Message not synced yet, merge optimistic with synced messages
+            // Remove duplicates and keep optimistic message
+            const messageIds = new Set(messagesResponse.items.map((m) => m.id));
+            if (!messageIds.has(optimisticMessage.id)) {
+              setMessages([...messagesResponse.items, optimisticMessage]);
+            } else {
+              setMessages(messagesResponse.items);
+            }
+          }
+
+          // Scroll to bottom after reloading
+          setTimeout(() => {
+            const messagesContainer =
+              document.getElementById("messages-container");
+            if (messagesContainer) {
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+          }, 100);
+
+          // Also refresh the chat list
+          loadChats();
+        } catch (error) {
+          console.error("Failed to sync messages:", error);
+          // On error, keep the optimistic message
+        }
+      }, 2000); // Increased to 2 seconds to give backend sync time to complete
+    } catch (err) {
+      console.error("Failed to send message:", err);
+      throw err; // Let the MessageInput component handle the error
     }
   };
 
@@ -426,15 +539,23 @@ export default function ChatsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div
-                    id="messages-container"
-                    className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-900"
-                  >
-                    <MessageList
-                      messages={messages}
-                      loading={messagesLoading}
+                  <>
+                    <div
+                      id="messages-container"
+                      className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-900"
+                    >
+                      <MessageList
+                        messages={messages}
+                        loading={messagesLoading}
+                      />
+                    </div>
+
+                    {/* Message Input */}
+                    <MessageInput
+                      onSendMessage={handleSendMessage}
+                      disabled={messagesLoading}
                     />
-                  </div>
+                  </>
                 )}
               </div>
             ) : (

@@ -1,7 +1,13 @@
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query, Path
-from .client import list_all_chats, list_chat_messages
-from .schemas import ChatListResponse, MessageListResponse
+import logging
+from fastapi import APIRouter, HTTPException, Query, Path, File, Form, UploadFile, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from .client import list_all_chats, list_chat_messages, send_message, get_unipile_client
+from .schemas import ChatListResponse, MessageListResponse, MessageSentResponse
+from app.db.base import get_db
+from app.services.message_sync import sync_chat_messages
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/api/unipile", tags=["Unipile Integration"])
@@ -195,5 +201,138 @@ async def list_chat_attendees(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch attendees from Unipile: {str(e)}"
+        )
+
+
+@router.post("/chats/{chat_id}/messages", response_model=MessageSentResponse, status_code=201)
+async def send_message_in_chat(
+    chat_id: str = Path(
+        ...,
+        description="The id of the chat where to send the message"
+    ),
+    text: Optional[str] = Form(
+        None,
+        description="The message text"
+    ),
+    account_id: Optional[str] = Form(
+        None,
+        description="An account_id can be specified to prevent the user from sending messages in chats not belonging to the account"
+    ),
+    thread_id: Optional[str] = Form(
+        None,
+        description="Optional and for Slack's messaging only. The id of the thread to send the message in"
+    ),
+    quote_id: Optional[str] = Form(
+        None,
+        description="The id of a message to quote/reply to"
+    ),
+    voice_message: Optional[UploadFile] = File(
+        None,
+        description="(Whatsapp & Linkedin) A file to send as voice message. We recommend usage of .m4a format for Linkedin. For Instagram and Telegram you need to use attachment field"
+    ),
+    video_message: Optional[UploadFile] = File(
+        None,
+        description="(Linkedin) A file to send as video message"
+    ),
+    attachments: Optional[list[UploadFile]] = File(
+        None,
+        description="List of files to attach"
+    ),
+    typing_duration: Optional[str] = Form(
+        None,
+        description="(WhatsApp only) Set a duration in milliseconds to simulate a typing status for that duration before sending the message"
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> MessageSentResponse:
+    """
+    Send a message in a chat.
+
+    This endpoint proxies the Unipile API's POST `/api/v1/chats/{chat_id}/messages` endpoint
+    to send a message with optional attachments.
+
+    **Path Parameters:**
+    - `chat_id`: The id of the chat where to send the message
+
+    **Form Data:**
+    - `text`: The message text
+    - `account_id`: Optional account_id to restrict message sending
+    - `thread_id`: Optional thread_id for Slack
+    - `quote_id`: Optional message_id to quote/reply to
+    - `voice_message`: Optional voice message file
+    - `video_message`: Optional video message file
+    - `attachments`: Optional list of file attachments
+    - `typing_duration`: Optional typing simulation duration (WhatsApp only)
+
+    **Returns:**
+    - `MessageSentResponse` with the message_id
+
+    **Example:**
+    ```
+    POST /api/unipile/chats/abc123/messages
+    Content-Type: multipart/form-data
+
+    text=Hello World!
+    ```
+    """
+    try:
+        # Prepare file tuples if files are provided
+        voice_msg_tuple = None
+        if voice_message:
+            voice_msg_tuple = (
+                voice_message.filename or "voice_message",
+                voice_message.file,
+                voice_message.content_type or "application/octet-stream",
+            )
+
+        video_msg_tuple = None
+        if video_message:
+            video_msg_tuple = (
+                video_message.filename or "video_message",
+                video_message.file,
+                video_message.content_type or "application/octet-stream",
+            )
+
+        attachment_tuples = None
+        if attachments:
+            attachment_tuples = [
+                (
+                    att.filename or f"attachment_{i}",
+                    att.file,
+                    att.content_type or "application/octet-stream",
+                )
+                for i, att in enumerate(attachments)
+            ]
+
+        response = await send_message(
+            chat_id=chat_id,
+            text=text,
+            account_id=account_id,
+            thread_id=thread_id,
+            quote_id=quote_id,
+            voice_message=voice_msg_tuple,
+            video_message=video_msg_tuple,
+            attachments=attachment_tuples,
+            typing_duration=typing_duration,
+        )
+        
+        # Trigger sync after successful message send to update database
+        try:
+            logger.info(f"Triggering message sync for chat {chat_id} after successful send")
+            await sync_chat_messages(db, chat_id, full_sync=False)
+            logger.info(f"Message sync completed for chat {chat_id}")
+        except Exception as sync_error:
+            # Log but don't fail the request if sync fails
+            logger.warning(f"Failed to sync messages after send for chat {chat_id}: {str(sync_error)}")
+        
+        return response
+    except ValueError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Configuration error: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send message via Unipile: {str(e)}"
         )
 

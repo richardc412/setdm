@@ -1,7 +1,14 @@
-from typing import Optional
+from typing import Optional, BinaryIO
 import httpx
 from app.core.config import get_settings
-from .schemas import ChatListResponse, Chat, MessageListResponse, Message, ChatAttendeeListResponse
+from .schemas import (
+    ChatListResponse,
+    Chat,
+    MessageListResponse,
+    Message,
+    ChatAttendeeListResponse,
+    MessageSentResponse,
+)
 
 
 class UnipileClient:
@@ -198,6 +205,81 @@ class UnipileClient:
 
             return ChatAttendeeListResponse(**data)
 
+    async def send_message(
+        self,
+        chat_id: str,
+        text: Optional[str] = None,
+        account_id: Optional[str] = None,
+        thread_id: Optional[str] = None,
+        quote_id: Optional[str] = None,
+        voice_message: Optional[tuple[str, BinaryIO, str]] = None,
+        video_message: Optional[tuple[str, BinaryIO, str]] = None,
+        attachments: Optional[list[tuple[str, BinaryIO, str]]] = None,
+        typing_duration: Optional[str] = None,
+    ) -> MessageSentResponse:
+        """
+        Send a message in a chat.
+
+        Args:
+            chat_id: The id of the chat where to send the message
+            text: The message text
+            account_id: An account_id can be specified to prevent the user from sending messages in chats not belonging to the account
+            thread_id: Optional and for Slack's messaging only. The id of the thread to send the message in
+            quote_id: The id of a message to quote/reply to
+            voice_message: A file to send as voice message (filename, file object, mimetype)
+            video_message: A file to send as video message (filename, file object, mimetype)
+            attachments: List of files to attach (filename, file object, mimetype)
+            typing_duration: (WhatsApp only) Duration in milliseconds to simulate typing
+
+        Returns:
+            MessageSentResponse containing the message_id
+
+        Raises:
+            httpx.HTTPStatusError: If the API returns an error status
+            httpx.RequestError: If there's a network/connection error
+        """
+        url = f"{self.base_url}/api/v1/chats/{chat_id}/messages"
+
+        # Build form data
+        data = {}
+        if text:
+            data["text"] = text
+        if account_id:
+            data["account_id"] = account_id
+        if thread_id:
+            data["thread_id"] = thread_id
+        if quote_id:
+            data["quote_id"] = quote_id
+        if typing_duration:
+            data["typing_duration"] = typing_duration
+
+        # Build files dictionary
+        files = {}
+        if voice_message:
+            files["voice_message"] = voice_message
+        if video_message:
+            files["video_message"] = video_message
+        if attachments:
+            # For multiple files with same key, httpx expects list of tuples
+            files["attachments"] = attachments
+
+        # Remove Content-Type from headers for multipart/form-data
+        # httpx will set it automatically with boundary
+        headers = {k: v for k, v in self.headers.items() if k.lower() != "content-type"}
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url,
+                headers=headers,
+                data=data,
+                files=files if files else None,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            response_data = response.json()
+
+            return MessageSentResponse(**response_data)
+
 
 def get_unipile_client() -> UnipileClient:
     """
@@ -323,5 +405,66 @@ async def list_chat_messages(
         after=after,
         limit=limit,
         sender_id=sender_id,
+    )
+
+
+async def send_message(
+    chat_id: str,
+    text: Optional[str] = None,
+    account_id: Optional[str] = None,
+    thread_id: Optional[str] = None,
+    quote_id: Optional[str] = None,
+    voice_message: Optional[tuple[str, BinaryIO, str]] = None,
+    video_message: Optional[tuple[str, BinaryIO, str]] = None,
+    attachments: Optional[list[tuple[str, BinaryIO, str]]] = None,
+    typing_duration: Optional[str] = None,
+) -> MessageSentResponse:
+    """
+    Convenience function to send a message in a chat using the configured client.
+
+    This is a wrapper around UnipileClient.send_message() that automatically
+    initializes the client with settings from the environment.
+
+    Args:
+        chat_id: The id of the chat where to send the message
+        text: The message text
+        account_id: An account_id can be specified to prevent the user from sending messages in chats not belonging to the account
+        thread_id: Optional and for Slack's messaging only. The id of the thread to send the message in
+        quote_id: The id of a message to quote/reply to
+        voice_message: A file to send as voice message (filename, file object, mimetype)
+        video_message: A file to send as video message (filename, file object, mimetype)
+        attachments: List of files to attach (filename, file object, mimetype)
+        typing_duration: (WhatsApp only) Duration in milliseconds to simulate typing
+
+    Returns:
+        MessageSentResponse containing the message_id
+
+    Example:
+        ```python
+        from app.integration.unipile import send_message
+
+        # Send a simple text message
+        response = await send_message(chat_id="abc123", text="Hello!")
+
+        # Send a message with attachments
+        with open("image.jpg", "rb") as f:
+            response = await send_message(
+                chat_id="abc123",
+                text="Check this out!",
+                attachments=[("image.jpg", f, "image/jpeg")]
+            )
+        ```
+    """
+    client = get_unipile_client()
+    return await client.send_message(
+        chat_id=chat_id,
+        text=text,
+        account_id=account_id,
+        thread_id=thread_id,
+        quote_id=quote_id,
+        voice_message=voice_message,
+        video_message=video_message,
+        attachments=attachments,
+        typing_duration=typing_duration,
     )
 

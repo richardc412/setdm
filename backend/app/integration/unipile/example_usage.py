@@ -4,7 +4,7 @@ Example usage of the Unipile integration.
 This file demonstrates how to use the Unipile client in various scenarios.
 """
 
-from .client import list_all_chats, list_chat_messages, get_unipile_client
+from .client import list_all_chats, list_chat_messages, send_message, get_unipile_client
 
 
 async def example_get_all_chats():
@@ -210,10 +210,151 @@ async def example_using_client_for_messages():
         print(f"- [{sender}] {message.text or '[attachment]'}")
 
 
+# ============================================================================
+# SEND MESSAGE EXAMPLES
+# ============================================================================
+
+
+async def example_send_simple_text_message():
+    """Send a simple text message to a chat."""
+    chat_id = "your_chat_id_here"
+    response = await send_message(
+        chat_id=chat_id,
+        text="Hello! This is a test message."
+    )
+    print(f"Message sent successfully. Message ID: {response.message_id}")
+
+
+async def example_send_message_with_quote():
+    """Send a message that quotes/replies to another message."""
+    chat_id = "your_chat_id_here"
+    message_to_quote_id = "message_id_to_quote"
+    
+    response = await send_message(
+        chat_id=chat_id,
+        text="I agree with this!",
+        quote_id=message_to_quote_id
+    )
+    print(f"Reply sent. Message ID: {response.message_id}")
+
+
+async def example_send_message_with_attachments():
+    """Send a message with file attachments."""
+    chat_id = "your_chat_id_here"
+    
+    # Open files and send
+    with open("document.pdf", "rb") as f1, open("image.jpg", "rb") as f2:
+        attachments = [
+            ("document.pdf", f1, "application/pdf"),
+            ("image.jpg", f2, "image/jpeg"),
+        ]
+        
+        response = await send_message(
+            chat_id=chat_id,
+            text="Here are the files you requested.",
+            attachments=attachments
+        )
+        print(f"Message with attachments sent. Message ID: {response.message_id}")
+
+
+async def example_send_voice_message():
+    """Send a voice message (WhatsApp & LinkedIn)."""
+    chat_id = "your_chat_id_here"
+    
+    with open("voice_note.m4a", "rb") as f:
+        voice_msg = ("voice_note.m4a", f, "audio/m4a")
+        
+        response = await send_message(
+            chat_id=chat_id,
+            voice_message=voice_msg
+        )
+        print(f"Voice message sent. Message ID: {response.message_id}")
+
+
+async def example_send_video_message():
+    """Send a video message (LinkedIn)."""
+    chat_id = "your_chat_id_here"
+    
+    with open("video.mp4", "rb") as f:
+        video_msg = ("video.mp4", f, "video/mp4")
+        
+        response = await send_message(
+            chat_id=chat_id,
+            text="Check out this video!",
+            video_message=video_msg
+        )
+        print(f"Video message sent. Message ID: {response.message_id}")
+
+
+async def example_send_whatsapp_with_typing():
+    """Send a WhatsApp message with typing simulation."""
+    chat_id = "your_chat_id_here"
+    
+    response = await send_message(
+        chat_id=chat_id,
+        text="This message will appear after typing simulation.",
+        typing_duration="3000"  # 3 seconds
+    )
+    print(f"Message sent with typing simulation. Message ID: {response.message_id}")
+
+
+async def example_send_message_to_slack_thread():
+    """Send a message to a Slack thread."""
+    chat_id = "your_chat_id_here"
+    thread_id = "slack_thread_id"
+    
+    response = await send_message(
+        chat_id=chat_id,
+        text="Reply to the thread!",
+        thread_id=thread_id
+    )
+    print(f"Message sent to Slack thread. Message ID: {response.message_id}")
+
+
+async def example_send_with_account_restriction():
+    """Send a message with account_id restriction."""
+    chat_id = "your_chat_id_here"
+    account_id = "your_account_id"
+    
+    response = await send_message(
+        chat_id=chat_id,
+        text="This message is sent with account restriction.",
+        account_id=account_id
+    )
+    print(f"Message sent. Message ID: {response.message_id}")
+
+
+async def example_using_client_to_send_message():
+    """Use the UnipileClient directly to send a message."""
+    client = get_unipile_client()
+    chat_id = "your_chat_id_here"
+    
+    response = await client.send_message(
+        chat_id=chat_id,
+        text="Message sent using client directly."
+    )
+    
+    print(f"Message sent. Message ID: {response.message_id}")
+
+
+async def example_send_message_error_handling():
+    """Demonstrate error handling when sending messages."""
+    chat_id = "invalid_chat_id"
+    
+    try:
+        response = await send_message(
+            chat_id=chat_id,
+            text="This will likely fail."
+        )
+        print(f"Message sent: {response.message_id}")
+    except Exception as e:
+        print(f"Failed to send message: {e}")
+
+
 # Example of how to use in a FastAPI route
 """
-from fastapi import APIRouter, HTTPException
-from app.integration.unipile import list_all_chats, list_chat_messages
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from app.integration.unipile import list_all_chats, list_chat_messages, send_message
 
 router = APIRouter()
 
@@ -236,6 +377,32 @@ async def get_messages(chat_id: str, limit: int = 50):
             "total": len(response.items),
             "messages": response.items,
             "cursor": response.cursor
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/chat/{chat_id}/send")
+async def send_chat_message(
+    chat_id: str,
+    text: str = Form(...),
+    attachments: list[UploadFile] = File(None)
+):
+    try:
+        attachment_tuples = None
+        if attachments:
+            attachment_tuples = [
+                (att.filename, att.file, att.content_type)
+                for att in attachments
+            ]
+        
+        response = await send_message(
+            chat_id=chat_id,
+            text=text,
+            attachments=attachment_tuples
+        )
+        return {
+            "success": True,
+            "message_id": response.message_id
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

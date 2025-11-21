@@ -240,6 +240,162 @@ async def get_all_messages(chat_id: str):
     return all_messages
 ```
 
+---
+
+## Sending Messages
+
+### Option 1: Using the API Endpoint
+
+Send a message to a chat with optional attachments:
+
+```
+POST /api/unipile/chats/{chat_id}/messages
+Content-Type: multipart/form-data
+```
+
+#### Path Parameters:
+
+- `chat_id` (string, required): The id of the chat where to send the message
+
+#### Form Data Parameters:
+
+- `text` (string, optional): The message text
+- `account_id` (string, optional): An account_id can be specified to prevent the user from sending messages in chats not belonging to the account
+- `thread_id` (string, optional): Optional and for Slack's messaging only. The id of the thread to send the message in
+- `quote_id` (string, optional): The id of a message to quote/reply to
+- `voice_message` (file, optional): A file to send as voice message (WhatsApp & LinkedIn). We recommend usage of .m4a format for LinkedIn. For Instagram and Telegram you need to use attachment field
+- `video_message` (file, optional): A file to send as video message (LinkedIn)
+- `attachments` (array of files, optional): List of files to attach
+- `typing_duration` (string, optional): (WhatsApp only) Set a duration in milliseconds to simulate a typing status for that duration before sending the message
+
+#### Example Requests:
+
+```bash
+# Send a simple text message
+curl -X POST http://localhost:8000/api/unipile/chats/abc123/messages \
+  -F "text=Hello, how are you?"
+
+# Send a message with quote/reply
+curl -X POST http://localhost:8000/api/unipile/chats/abc123/messages \
+  -F "text=I agree!" \
+  -F "quote_id=msg_456"
+
+# Send a message with file attachments
+curl -X POST http://localhost:8000/api/unipile/chats/abc123/messages \
+  -F "text=Here are the files" \
+  -F "attachments=@document.pdf" \
+  -F "attachments=@image.jpg"
+
+# Send a voice message (WhatsApp/LinkedIn)
+curl -X POST http://localhost:8000/api/unipile/chats/abc123/messages \
+  -F "voice_message=@voice_note.m4a"
+
+# Send a video message (LinkedIn)
+curl -X POST http://localhost:8000/api/unipile/chats/abc123/messages \
+  -F "text=Check this out!" \
+  -F "video_message=@video.mp4"
+
+# Send to Slack thread
+curl -X POST http://localhost:8000/api/unipile/chats/abc123/messages \
+  -F "text=Reply to thread" \
+  -F "thread_id=slack_thread_123"
+
+# Send with typing simulation (WhatsApp)
+curl -X POST http://localhost:8000/api/unipile/chats/abc123/messages \
+  -F "text=Hello!" \
+  -F "typing_duration=3000"
+```
+
+#### Response Format (201 Created):
+
+```json
+{
+  "object": "MessageSent",
+  "message_id": "msg_789"
+}
+```
+
+### Option 2: Using the Python Client Directly
+
+You can also use the Unipile client directly in your Python code:
+
+```python
+from app.integration.unipile import send_message, get_unipile_client
+
+# Send a simple text message
+async def send_text_message():
+    response = await send_message(
+        chat_id="abc123",
+        text="Hello, how are you?"
+    )
+    print(f"Message sent: {response.message_id}")
+
+# Send a message with quote/reply
+async def send_reply():
+    response = await send_message(
+        chat_id="abc123",
+        text="I agree!",
+        quote_id="msg_456"
+    )
+    print(f"Reply sent: {response.message_id}")
+
+# Send a message with attachments
+async def send_with_attachments():
+    with open("document.pdf", "rb") as f1, open("image.jpg", "rb") as f2:
+        attachments = [
+            ("document.pdf", f1, "application/pdf"),
+            ("image.jpg", f2, "image/jpeg"),
+        ]
+        response = await send_message(
+            chat_id="abc123",
+            text="Here are the files",
+            attachments=attachments
+        )
+        print(f"Message sent: {response.message_id}")
+
+# Send a voice message (WhatsApp/LinkedIn)
+async def send_voice():
+    with open("voice_note.m4a", "rb") as f:
+        voice_msg = ("voice_note.m4a", f, "audio/m4a")
+        response = await send_message(
+            chat_id="abc123",
+            voice_message=voice_msg
+        )
+        print(f"Voice message sent: {response.message_id}")
+
+# Send with typing simulation (WhatsApp)
+async def send_with_typing():
+    response = await send_message(
+        chat_id="abc123",
+        text="Hello!",
+        typing_duration="3000"  # 3 seconds
+    )
+    print(f"Message sent: {response.message_id}")
+
+# Using the client directly for more control
+async def send_message_advanced():
+    client = get_unipile_client()
+    response = await client.send_message(
+        chat_id="abc123",
+        text="Message sent using client directly."
+    )
+    return response
+```
+
+### Error Responses
+
+The endpoint may return the following error responses:
+
+- **401 Unauthorized**: Disconnected account
+- **403 Forbidden**: Feature not subscribed
+- **404 Not Found**: Account, chat or thread not found
+- **415 Unsupported Media Type**: The media has been rejected by the provider
+- **422 Unprocessable Entity**: Message couldn't pass validation
+- **429 Too Many Requests**: The provider cannot accept any more requests at the moment
+- **500 Internal Server Error**: Unexpected error or provider error
+- **503 Service Unavailable**: Network down on server side
+- **504 Gateway Timeout**: Request timed out
+
 ## Data Model
 
 ### Chat Fields
@@ -297,6 +453,15 @@ The message objects contain the following fields:
 | `attendee_distance` | integer or null | LinkedIn connection distance (1-4, -1) |
 | `sender_urn` | string or null | LinkedIn URN |
 | `reply_to` | object or null | Reply-to message reference |
+
+### MessageSent Response
+
+When sending a message, the API returns a MessageSent response:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `object` | string | Always "MessageSent" |
+| `message_id` | string or null | The Unipile ID of the newly sent message |
 
 ### Attachment Types
 

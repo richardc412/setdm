@@ -1,5 +1,5 @@
 from typing import Optional, Any, Union
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 # Chat Attendee Types
@@ -228,4 +228,36 @@ class MessageListResponse(BaseModel):
     object: str  # "MessageList"
     items: list[Message]
     cursor: Optional[Any] = None
+
+
+# Send Message Types
+
+class SendMessageRequest(BaseModel):
+    """
+    Request model for sending a message in a chat.
+    """
+    text: Optional[str] = None
+    account_id: Optional[str] = None
+    thread_id: Optional[str] = None
+    quote_id: Optional[str] = None
+    typing_duration: Optional[str] = None
+
+
+class MessageSentResponse(BaseModel):
+    """
+    Response model for send message endpoint.
+    """
+    object: str  # "MessageSent"
+    message_id: Optional[str] = None
+    
+    @field_validator('message_id', mode='before')
+    @classmethod
+    def normalize_message_id(cls, v):
+        """
+        Normalize message_id: convert list to string if needed.
+        Unipile sometimes returns message_id as a list with a single element.
+        """
+        if isinstance(v, list) and len(v) > 0:
+            return v[0]
+        return v
 

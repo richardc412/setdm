@@ -1,6 +1,7 @@
 """Message synchronization service for syncing with Unipile API."""
 import logging
 from typing import Optional
+from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -139,9 +140,19 @@ async def sync_chat_messages(
         # Get last message timestamp for incremental sync
         after_timestamp = None
         if not full_sync:
-            after_timestamp = await get_latest_message_timestamp(db, chat_id)
-            if after_timestamp:
-                logger.info(f"Performing incremental sync for chat {chat_id} after {after_timestamp}")
+            last_timestamp = await get_latest_message_timestamp(db, chat_id)
+            if last_timestamp:
+                # Subtract 1 day for redundancy to catch any missed messages
+                try:
+                    last_dt = datetime.fromisoformat(last_timestamp.replace('Z', '+00:00'))
+                    sync_from_dt = last_dt - timedelta(days=1)
+                    after_timestamp = sync_from_dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                    logger.info(f"Performing incremental sync for chat {chat_id} from {after_timestamp} (1 day before last message at {last_timestamp})")
+                except (ValueError, AttributeError) as e:
+                    # If timestamp parsing fails, use the original timestamp
+                    logger.warning(f"Failed to parse timestamp {last_timestamp}, using as-is: {e}")
+                    after_timestamp = last_timestamp
+                    logger.info(f"Performing incremental sync for chat {chat_id} after {after_timestamp}")
         
         cursor = None
         latest_timestamp = None

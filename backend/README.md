@@ -25,7 +25,7 @@ It downloads the wheels and keeps the local `.venv` aligned with the lockfile.
 
 Environment variables are loaded from `/Users/idkdude/Desktop/setdm/backend/.env`
 via [`pydantic-settings`](https://docs.pydantic.dev/latest/concepts/pydantic_settings/).
-Create that file (it is git-ignored) from the template:
+-Create that file (it is git-ignored) from the template:
 
 ```bash
 cp ENV.example .env

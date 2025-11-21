@@ -333,5 +333,73 @@ export async function getChatMessages(
   return response.json();
 }
 
+/**
+ * Send Message API Types
+ */
+export interface SendMessageRequest {
+  text?: string;
+  account_id?: string;
+  thread_id?: string;
+  quote_id?: string;
+  typing_duration?: string;
+  attachments?: File[];
+  voice_message?: File;
+  video_message?: File;
+}
+
+export interface SendMessageResponse {
+  object: string;
+  message_id: string | null;
+}
+
+/**
+ * Send a message to a chat via Unipile
+ */
+export async function sendMessage(
+  chatId: string,
+  request: SendMessageRequest
+): Promise<SendMessageResponse> {
+  const formData = new FormData();
+  
+  if (request.text) {
+    formData.append('text', request.text);
+  }
+  if (request.account_id) {
+    formData.append('account_id', request.account_id);
+  }
+  if (request.thread_id) {
+    formData.append('thread_id', request.thread_id);
+  }
+  if (request.quote_id) {
+    formData.append('quote_id', request.quote_id);
+  }
+  if (request.typing_duration) {
+    formData.append('typing_duration', request.typing_duration);
+  }
+  if (request.voice_message) {
+    formData.append('voice_message', request.voice_message);
+  }
+  if (request.video_message) {
+    formData.append('video_message', request.video_message);
+  }
+  if (request.attachments && request.attachments.length > 0) {
+    request.attachments.forEach((file) => {
+      formData.append('attachments', file);
+    });
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/unipile/chats/${chatId}/messages`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Failed to send message' }));
+    throw new ApiError(response.status, error.detail || 'Failed to send message');
+  }
+
+  return response.json();
+}
+
 export { ApiError };
 
