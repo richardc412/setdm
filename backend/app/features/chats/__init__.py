@@ -1,0 +1,2 @@
+"""Chats feature package."""
+

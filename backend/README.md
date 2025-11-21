@@ -25,17 +25,48 @@ It downloads the wheels and keeps the local `.venv` aligned with the lockfile.
 
 Environment variables are loaded from `/Users/idkdude/Desktop/setdm/backend/.env`
 via [`pydantic-settings`](https://docs.pydantic.dev/latest/concepts/pydantic_settings/).
-Create that file (it is git-ignored) and define any settings you need:
+Create that file (it is git-ignored) from the template:
 
-```dotenv
-APP_NAME=Hackathon API
-ENVIRONMENT=local
-DEBUG=false
+```bash
+cp ENV.example .env
 ```
 
-These values populate the `Settings` model in `app/config.py` and are available
-through FastAPI dependencies (for example, the `/health` endpoint reports the
-current environment and debug flag).
+Then edit `.env` with your configuration:
+
+```dotenv
+# Unipile API
+UNIPILE_DSN=https://api.unipile.com:13420
+UNIPILE_API_KEY=your-api-key-here
+
+# Database
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/setdm_db
+
+# Application
+DEBUG=false
+
+# JWT Authentication
+SECRET_KEY=your-secret-key-here
+```
+
+These values populate the `Settings` model in `app/core/config.py` and are available
+through FastAPI dependencies.
+
+## Database Setup
+
+This application uses PostgreSQL to persist Instagram messages and chats. See **[DATABASE_SETUP.md](DATABASE_SETUP.md)** for:
+
+- PostgreSQL installation instructions
+- Database creation and configuration
+- Schema documentation
+- API endpoint usage
+- Troubleshooting guide
+
+**Quick Start:**
+
+1. Install PostgreSQL: `brew install postgresql@15`
+2. Create database: `psql -c "CREATE DATABASE setdm_db;"`
+3. Configure `DATABASE_URL` in `.env`
+4. Run the app - tables are created automatically on startup
 
 ## Common commands
 

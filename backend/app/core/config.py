@@ -11,8 +11,15 @@ ENV_FILE = BASE_DIR / ".env"
 class Settings(BaseSettings):
     """Application configuration sourced from environment variables."""
 
+    # Unipile API Settings
     unipile_dsn: str = ""
     unipile_api_key: str = ""
+    
+    # Database Settings
+    database_url: str = "postgresql+asyncpg://user:password@localhost:5432/setdm_db"
+    
+    # Application Settings
+    debug: bool = False
     
     # JWT Settings
     secret_key: str = "your-secret-key-here-change-in-production"
