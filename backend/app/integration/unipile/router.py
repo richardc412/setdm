@@ -1,7 +1,7 @@
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
-from .client import list_all_chats
-from .schemas import ChatListResponse
+from fastapi import APIRouter, HTTPException, Query, Path
+from .client import list_all_chats, list_chat_messages
+from .schemas import ChatListResponse, MessageListResponse
 
 
 router = APIRouter(prefix="/api/unipile", tags=["Unipile Integration"])
@@ -86,5 +86,82 @@ async def get_all_chats(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch chats from Unipile: {str(e)}"
+        )
+
+
+@router.get("/chats/{chat_id}/messages", response_model=MessageListResponse)
+async def get_chat_messages(
+    chat_id: str = Path(
+        ...,
+        description="The id of the chat related to requested messages"
+    ),
+    cursor: Optional[str] = Query(
+        None,
+        description="Cursor for pagination"
+    ),
+    before: Optional[str] = Query(
+        None,
+        description="Filter items created before datetime (ISO 8601 UTC)",
+        pattern=r"^[1-2]\d{3}-[0-1]\d-[0-3]\dT\d{2}:\d{2}:\d{2}.\d{3}Z$"
+    ),
+    after: Optional[str] = Query(
+        None,
+        description="Filter items created after datetime (ISO 8601 UTC)",
+        pattern=r"^[1-2]\d{3}-[0-1]\d-[0-3]\dT\d{2}:\d{2}:\d{2}.\d{3}Z$"
+    ),
+    limit: Optional[int] = Query(
+        None,
+        ge=1,
+        le=250,
+        description="Limit number of items (1-250)"
+    ),
+    sender_id: Optional[str] = Query(
+        None,
+        description="Filter messages from a specific sender"
+    ),
+) -> MessageListResponse:
+    """
+    List all messages from a specific chat.
+
+    This endpoint proxies the Unipile API's `/api/v1/chats/{chat_id}/messages` endpoint
+    and returns message objects from the specified chat.
+
+    **Path Parameters:**
+    - `chat_id`: The id of the chat related to requested messages
+
+    **Query Parameters:**
+    - `cursor`: Cursor for pagination
+    - `before`: Filter items created before datetime (ISO 8601 UTC)
+    - `after`: Filter items created after datetime (ISO 8601 UTC)
+    - `limit`: Limit number of items (1-250)
+    - `sender_id`: Filter messages from a specific sender
+
+    **Returns:**
+    - `MessageListResponse` with message objects
+
+    **Example:**
+    ```
+    GET /api/unipile/chats/abc123/messages?limit=50
+    ```
+    """
+    try:
+        response = await list_chat_messages(
+            chat_id=chat_id,
+            cursor=cursor,
+            before=before,
+            after=after,
+            limit=limit,
+            sender_id=sender_id,
+        )
+        return response
+    except ValueError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Configuration error: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch messages from Unipile: {str(e)}"
         )
 

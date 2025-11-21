@@ -1,6 +1,6 @@
 # Unipile Integration
 
-This module provides integration with the Unipile API for managing chats across multiple messaging platforms (WhatsApp, LinkedIn, Slack, Twitter, Messenger, Instagram, Telegram).
+This module provides integration with the Unipile API for managing chats and messages across multiple messaging platforms (WhatsApp, LinkedIn, Slack, Twitter, Messenger, Instagram, Telegram).
 
 ## Configuration
 
@@ -110,6 +110,136 @@ async def my_chats(
     return chats
 ```
 
+---
+
+## Listing Messages from a Chat
+
+### Option 1: Using the API Endpoint
+
+Get messages from a specific chat:
+
+```
+GET /api/unipile/chats/{chat_id}/messages
+```
+
+#### Path Parameters:
+
+- `chat_id` (string, required): The id of the chat related to requested messages
+
+#### Query Parameters:
+
+- `cursor` (string, optional): Cursor for pagination
+- `before` (string, optional): Filter items created before datetime (ISO 8601 UTC format: `2025-12-31T23:59:59.999Z`)
+- `after` (string, optional): Filter items created after datetime (ISO 8601 UTC format: `2025-12-31T23:59:59.999Z`)
+- `limit` (integer, optional): Limit number of items (1-250)
+- `sender_id` (string, optional): Filter messages from a specific sender
+
+#### Example Requests:
+
+```bash
+# Get all messages from a chat
+curl http://localhost:8000/api/unipile/chats/abc123/messages
+
+# Get recent messages with limit
+curl http://localhost:8000/api/unipile/chats/abc123/messages?limit=50
+
+# Get messages from a specific sender
+curl http://localhost:8000/api/unipile/chats/abc123/messages?sender_id=sender123
+
+# Get messages with pagination
+curl http://localhost:8000/api/unipile/chats/abc123/messages?limit=100&cursor=xyz789
+
+# Get messages in a date range
+curl "http://localhost:8000/api/unipile/chats/abc123/messages?after=2025-11-01T00:00:00.000Z&before=2025-11-30T23:59:59.999Z"
+```
+
+#### Response Format:
+
+```json
+{
+  "object": "MessageList",
+  "items": [
+    {
+      "object": "Message",
+      "id": "msg_123",
+      "account_id": "acc_456",
+      "chat_id": "chat_789",
+      "chat_provider_id": "provider_chat_id",
+      "provider_id": "provider_msg_id",
+      "sender_id": "sender_123",
+      "sender_attendee_id": "attendee_456",
+      "text": "Hello, how are you?",
+      "timestamp": "2025-11-21T10:30:00.000Z",
+      "is_sender": 1,
+      "attachments": [],
+      "reactions": [
+        {
+          "value": "👍",
+          "sender_id": "sender_789",
+          "is_sender": false
+        }
+      ],
+      "seen": 1,
+      "seen_by": {},
+      "hidden": 0,
+      "deleted": 0,
+      "edited": 0,
+      "is_event": 0,
+      "delivered": 1,
+      "behavior": 0,
+      "original": "Hello, how are you?"
+    }
+  ],
+  "cursor": "next_page_cursor_or_null"
+}
+```
+
+### Option 2: Using the Python Client Directly
+
+You can also use the Unipile client directly in your Python code:
+
+```python
+from app.integration.unipile import list_chat_messages, get_unipile_client
+
+# Using the convenience function
+async def get_messages():
+    chat_id = "your_chat_id_here"
+    response = await list_chat_messages(chat_id=chat_id, limit=50)
+    for message in response.items:
+        sender = "You" if message.is_sender == 1 else message.sender_id
+        print(f"{sender}: {message.text or '[attachment]'}")
+
+# Using the client directly for more control
+async def get_messages_advanced():
+    client = get_unipile_client()
+    chat_id = "your_chat_id_here"
+    response = await client.list_chat_messages(
+        chat_id=chat_id,
+        limit=100,
+        sender_id="specific_sender_id"
+    )
+    return response
+
+# Pagination example
+async def get_all_messages(chat_id: str):
+    all_messages = []
+    cursor = None
+    
+    while True:
+        response = await list_chat_messages(
+            chat_id=chat_id,
+            cursor=cursor,
+            limit=250
+        )
+        all_messages.extend(response.items)
+        
+        if not response.cursor:
+            break
+        cursor = response.cursor
+    
+    return all_messages
+```
+
 ## Data Model
 
 ### Chat Fields
@@ -127,6 +257,68 @@ The integration returns simplified chat objects with only the essential fields:
 | `timestamp` | string or null | Last message timestamp (ISO 8601) |
 | `unread_count` | integer | Number of unread messages |
 | `unread` | boolean | Whether chat has unread messages (derived from unread_count) |
+
+### Message Fields
+
+The message objects contain the following fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `object` | string | Always "Message" |
+| `id` | string | Unique message identifier |
+| `account_id` | string | Account identifier |
+| `chat_id` | string | Chat identifier |
+| `chat_provider_id` | string | Provider-specific chat identifier |
+| `provider_id` | string | Provider-specific message identifier |
+| `sender_id` | string | Sender identifier |
+| `sender_attendee_id` | string | Sender attendee identifier |
+| `text` | string or null | Message text content |
+| `timestamp` | string | Message timestamp (ISO 8601) |
+| `is_sender` | integer | 0 = received, 1 = sent |
+| `attachments` | array | List of attachment objects (images, videos, files, etc.) |
+| `reactions` | array | List of reaction objects |
+| `seen` | integer | 0 = not seen, 1 = seen |
+| `seen_by` | object | Dictionary of users who have seen the message |
+| `hidden` | integer | 0 = visible, 1 = hidden |
+| `deleted` | integer | 0 = not deleted, 1 = deleted |
+| `edited` | integer | 0 = not edited, 1 = edited |
+| `is_event` | integer | 0 = regular message, 1 = event message |
+| `delivered` | integer | 0 = not delivered, 1 = delivered |
+| `behavior` | integer or null | Message behavior type |
+| `original` | string | Original message content |
+| `quoted` | object or null | Quoted/replied-to message |
+| `event_type` | integer or null | Event type (if is_event = 1) |
+| `replies` | integer or null | Number of replies |
+| `reply_by` | array or null | List of user IDs who replied |
+| `parent` | string or null | Parent message ID (for threaded replies) |
+| `subject` | string or null | Message subject (for email-like messages) |
+| `message_type` | string or null | Type (MESSAGE, INVITATION, INMAIL, etc.) |
+| `attendee_type` | string or null | Attendee type (MEMBER, ORGANIZATION, OTHER) |
+| `attendee_distance` | integer or null | LinkedIn connection distance (1-4, -1) |
+| `sender_urn` | string or null | LinkedIn URN |
+| `reply_to` | object or null | Reply-to message reference |
+
+### Attachment Types
+
+Messages can contain various types of attachments:
+
+- **Image Attachment** (`type: "img"`): Images and stickers
+- **Video Attachment** (`type: "video"`): Videos and GIFs
+- **Audio Attachment** (`type: "audio"`): Audio files and voice notes
+- **File Attachment** (`type: "file"`): Generic file attachments
+- **LinkedIn Post** (`type: "linkedin_post"`): LinkedIn post references
+- **Video Meeting** (`type: "video_meeting"`): Video meeting links
+
+Each attachment type has common fields:
+- `id`: Attachment identifier
+- `type`: Attachment type
+- `unavailable`: Whether the attachment is available
+- `file_size`: Size in bytes (optional)
+- `mimetype`: MIME type (optional)
+- `url`: Download URL (optional)
+- `url_expires_at`: URL expiration timestamp (optional)
+
+And type-specific fields (e.g., `width`/`height` for images/videos, `file_name` for files, `duration` for audio, etc.).
 
 ## Error Handling
 

@@ -94,17 +94,20 @@ export default function DashboardPage() {
               Quick Actions
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button className="flex items-center justify-center px-4 py-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
-                <span>📊 View Analytics</span>
+              <button
+                onClick={() => router.push("/chats")}
+                className="flex items-center justify-center px-4 py-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+              >
+                <span>📷 Instagram DMs</span>
               </button>
               <button className="flex items-center justify-center px-4 py-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 font-medium hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
                 <span>⚙️ Settings</span>
               </button>
               <button className="flex items-center justify-center px-4 py-3 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 font-medium hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
-                <span>📝 New Project</span>
+                <span>📊 Analytics</span>
               </button>
               <button className="flex items-center justify-center px-4 py-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors">
-                <span>💬 Support</span>
+                <span>📝 New Campaign</span>
               </button>
             </div>
           </div>

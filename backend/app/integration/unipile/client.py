@@ -1,7 +1,7 @@
 from typing import Optional
 import httpx
 from app.core.config import get_settings
-from .schemas import ChatListResponse, Chat
+from .schemas import ChatListResponse, Chat, MessageListResponse, Message
 
 
 class UnipileClient:
@@ -104,6 +104,70 @@ class UnipileClient:
                 cursor=data.get("cursor"),
             )
 
+    async def list_chat_messages(
+        self,
+        chat_id: str,
+        cursor: Optional[str] = None,
+        before: Optional[str] = None,
+        after: Optional[str] = None,
+        limit: Optional[int] = None,
+        sender_id: Optional[str] = None,
+    ) -> MessageListResponse:
+        """
+        List all messages from a specific chat.
+
+        Args:
+            chat_id: The id of the chat related to requested messages
+            cursor: Cursor for pagination
+            before: Filter items created before datetime (ISO 8601 UTC)
+            after: Filter items created after datetime (ISO 8601 UTC)
+            limit: Limit number of items (1-250)
+            sender_id: Filter messages from a specific sender
+
+        Returns:
+            MessageListResponse containing message objects
+
+        Raises:
+            httpx.HTTPStatusError: If the API returns an error status
+            httpx.RequestError: If there's a network/connection error
+        """
+        # Build query parameters
+        params = {}
+        if cursor:
+            params["cursor"] = cursor
+        if before:
+            params["before"] = before
+        if after:
+            params["after"] = after
+        if limit is not None:
+            params["limit"] = limit
+        if sender_id:
+            params["sender_id"] = sender_id
+
+        url = f"{self.base_url}/api/v1/chats/{chat_id}/messages"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                url,
+                headers=self.headers,
+                params=params,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            # Parse messages
+            messages = []
+            for item in data.get("items", []):
+                message = Message(**item)
+                messages.append(message)
+
+            return MessageListResponse(
+                object=data.get("object"),
+                items=messages,
+                cursor=data.get("cursor"),
+            )
+
 
 def get_unipile_client() -> UnipileClient:
     """
@@ -179,5 +243,55 @@ async def list_all_chats(
         limit=limit,
         account_type=account_type,
         account_id=account_id,
+    )
+
+
+async def list_chat_messages(
+    chat_id: str,
+    cursor: Optional[str] = None,
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    limit: Optional[int] = None,
+    sender_id: Optional[str] = None,
+) -> MessageListResponse:
+    """
+    Convenience function to list messages from a chat using the configured client.
+
+    This is a wrapper around UnipileClient.list_chat_messages() that automatically
+    initializes the client with settings from the environment.
+
+    Args:
+        chat_id: The id of the chat related to requested messages
+        cursor: Cursor for pagination
+        before: Filter items created before datetime (ISO 8601 UTC)
+        after: Filter items created after datetime (ISO 8601 UTC)
+        limit: Limit number of items (1-250)
+        sender_id: Filter messages from a specific sender
+
+    Returns:
+        MessageListResponse containing message objects
+
+    Example:
+        ```python
+        from app.integration.unipile import list_chat_messages
+
+        # Get all messages from a chat
+        response = await list_chat_messages(chat_id="abc123")
+
+        # Get messages with pagination
+        response = await list_chat_messages(chat_id="abc123", limit=50)
+
+        # Get messages from a specific sender
+        response = await list_chat_messages(chat_id="abc123", sender_id="sender123")
+        ```
+    """
+    client = get_unipile_client()
+    return await client.list_chat_messages(
+        chat_id=chat_id,
+        cursor=cursor,
+        before=before,
+        after=after,
+        limit=limit,
+        sender_id=sender_id,
     )
 
