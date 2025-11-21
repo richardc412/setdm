@@ -249,6 +249,18 @@ async def create_message(
         if attendee and attendee.provider_id:
             resolved_sender_id = attendee.provider_id
     
+    # Check if this message exists in pending_messages to correctly set is_sender
+    # Unipile sometimes returns is_sender=0 for messages we sent, so we need to override it
+    is_sender_value = message_data.is_sender
+    pending_check = await db.execute(
+        select(PendingMessageModel).where(PendingMessageModel.message_id == message_data.id)
+    )
+    pending_message = pending_check.scalar_one_or_none()
+    if pending_message:
+        # This is a message we sent - override is_sender to 1
+        is_sender_value = 1
+        logger.info(f"Message {message_data.id} found in pending queue, setting is_sender=1")
+    
     # Convert Pydantic models to dicts for JSON fields
     attachments = [att if isinstance(att, dict) else att.model_dump() for att in message_data.attachments]
     reactions = [r.model_dump() for r in message_data.reactions]
@@ -264,7 +276,7 @@ async def create_message(
         sender_attendee_id=message_data.sender_attendee_id,
         text=message_data.text,
         timestamp=message_data.timestamp,
-        is_sender=message_data.is_sender,
+        is_sender=is_sender_value,
         attachments=attachments,
         reactions=reactions,
         seen_by=message_data.seen_by,

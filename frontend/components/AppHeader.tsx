@@ -60,14 +60,14 @@ export default function AppHeader({
           {/* Navigation Links */}
           <nav className="flex items-center gap-2">
             <Button
-              variant={isActive("/dashboard") ? "default" : "ghost"}
+              variant={isActive("/dashboard") ? "slate" : "ghost"}
               size="sm"
               asChild
             >
               <Link href="/dashboard">Dashboard</Link>
             </Button>
             <Button
-              variant={isActive("/chats") ? "default" : "ghost"}
+              variant={isActive("/chats") ? "slate" : "ghost"}
               size="sm"
               asChild
             >
@@ -82,7 +82,7 @@ export default function AppHeader({
               <span className="text-sm text-zinc-600 dark:text-zinc-400 hidden sm:inline-flex">
                 {user?.username ?? "Guest"}
               </span>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
+              <Button variant="slate" size="sm" onClick={handleLogout}>
                 Logout
               </Button>
             </>
