@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.features.auth import auth_router
+from app.features.example import example_router
 
 app = FastAPI(title="SetDM API")
 
@@ -14,8 +15,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include authentication router
+# Include routers
 app.include_router(auth_router)
+app.include_router(example_router)
 
 
 @app.get("/health")
