@@ -136,7 +136,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
             disabled ||
             sending
           }
-          className="flex-shrink-0 p-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+          className="flex-shrink-0 p-2.5 rounded-lg bg-slate-700 hover:bg-slate-800 text-white transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
         >
           {sending ? (
             <svg

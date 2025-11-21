@@ -468,7 +468,7 @@ export default function ChatsPage() {
                               />
                             ) : null}
                             <div
-                              className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xl font-bold shadow-lg"
+                              className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-white text-xl font-bold shadow-lg"
                               style={{ display: profilePic ? "none" : "flex" }}
                             >
                               {chat.name?.charAt(0).toUpperCase() || "?"}
@@ -527,7 +527,7 @@ export default function ChatsPage() {
             {selectedChat ? (
               <div className="w-full max-w-md h-full max-h-full flex flex-col bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
                 {/* Chat Header */}
-                <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-3 shadow-lg">
+                <div className="bg-slate-700 px-4 py-3 shadow-lg">
                   <div className="flex items-center gap-3">
                     {profilePictures[selectedChat.provider_id] ? (
                       <img
@@ -599,7 +599,7 @@ export default function ChatsPage() {
             ) : (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center max-w-md p-8">
-                  <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-2xl">
+                  <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-slate-700 flex items-center justify-center shadow-2xl">
                     <span className="text-5xl">💬</span>
                   </div>
                   <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">

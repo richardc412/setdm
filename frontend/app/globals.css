@@ -118,43 +118,8 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
-    background-image: repeating-linear-gradient(
-      45deg,
-      transparent,
-      transparent 8px,
-      rgba(0, 0, 0, 0.05) 8px,
-      rgba(0, 0, 0, 0.05) 9px
-    );
-  }
-  .dark body {
-    background-image: repeating-linear-gradient(
-      45deg,
-      transparent,
-      transparent 8px,
-      rgba(255, 255, 255, 0.08) 8px,
-      rgba(255, 255, 255, 0.08) 9px
-    );
   }
 }
 
 @layer utilities {
-  .diagonal-bg {
-    background-image: repeating-linear-gradient(
-      45deg,
-      transparent,
-      transparent 8px,
-      rgba(0, 0, 0, 0.05) 8px,
-      rgba(0, 0, 0, 0.05) 9px
-    );
-  }
-
-  .dark .diagonal-bg {
-    background-image: repeating-linear-gradient(
-      45deg,
-      transparent,
-      transparent 8px,
-      rgba(255, 255, 255, 0.08) 8px,
-      rgba(255, 255, 255, 0.08) 9px
-    );
-  }
 }

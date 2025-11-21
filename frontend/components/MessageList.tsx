@@ -113,7 +113,7 @@ export function MessageList({ messages, loading }: MessageListProps) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-3 border-purple-600 border-t-transparent mx-auto mb-3"></div>
+          <div className="animate-spin rounded-full h-10 w-10 border-3 border-slate-700 border-t-transparent mx-auto mb-3"></div>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 font-medium">
             Loading messages...
           </p>
@@ -126,7 +126,7 @@ export function MessageList({ messages, loading }: MessageListProps) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center p-8">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-700 flex items-center justify-center shadow-lg">
             <span className="text-3xl">💬</span>
           </div>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 font-medium">
@@ -153,7 +153,7 @@ export function MessageList({ messages, loading }: MessageListProps) {
             <div
               className={`max-w-[75%] ${
                 isSender
-                  ? 'bg-gradient-to-br from-purple-600 to-pink-600 text-white'
+                  ? 'bg-slate-700 text-white'
                   : 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700'
               } rounded-2xl px-4 py-2.5 shadow-md`}
             >
