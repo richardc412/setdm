@@ -20,7 +20,7 @@ export default function Home() {
 
   // Show loading state
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black diagonal-bg">
       <div className="text-center">
         <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
         <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">Loading...</p>

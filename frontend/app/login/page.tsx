@@ -40,7 +40,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-black px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-black px-4 diagonal-bg">
       <div className="w-full max-w-md">
         <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-xl p-8 space-y-6">
           {/* Header */}

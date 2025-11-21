@@ -2,39 +2,20 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import AppHeader from "@/components/AppHeader";
 import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
-
-  const handleLogout = async () => {
-    await logout();
-    router.push("/login");
-  };
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-zinc-50 dark:bg-black">
-        {/* Header */}
-        <header className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">
-                SetDM Dashboard
-              </h1>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-medium transition-colors"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </header>
+      <div className="min-h-screen bg-zinc-50 dark:bg-black flex flex-col diagonal-bg">
+        <AppHeader />
 
         {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Welcome Card */}
           <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-6 mb-6">
             <h2 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
@@ -116,4 +97,3 @@ export default function DashboardPage() {
     </ProtectedRoute>
   );
 }
-

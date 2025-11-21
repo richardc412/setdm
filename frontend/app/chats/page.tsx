@@ -1,7 +1,7 @@
 "use client";
 
-import { useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import AppHeader from "@/components/AppHeader";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -31,7 +31,6 @@ const sortChatsByPriority = (items: Chat[]) => {
 };
 
 export default function ChatsPage() {
-  const { user, logout } = useAuth();
   const router = useRouter();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -339,11 +338,6 @@ export default function ChatsPage() {
     };
   }, []);
 
-  const handleLogout = async () => {
-    await logout();
-    router.push("/login");
-  };
-
   const handleFilterChange = (key: keyof ChatFilters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value, offset: 0 }));
     setSelectedChat(null);
@@ -378,39 +372,8 @@ export default function ChatsPage() {
 
   return (
     <ProtectedRoute>
-      <div className="h-screen bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-black flex flex-col overflow-hidden">
-        {/* Sticky Header */}
-        <header className="flex-shrink-0 z-50 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => router.push("/dashboard")}
-                  className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
-                >
-                  ← Back
-                </button>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">📷</span>
-                  <h1 className="text-xl font-bold text-zinc-900 dark:text-white">
-                    Instagram DMs
-                  </h1>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                  {user?.username}
-                </span>
-                <button
-                  onClick={handleLogout}
-                  className="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white text-sm font-medium transition-colors"
-                >
-                  Logout
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
+      <div className="h-screen bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-black flex flex-col overflow-hidden diagonal-bg">
+        <AppHeader />
 
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full">

@@ -3,6 +3,7 @@
 import { useState, FormEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import AppHeader from "@/components/AppHeader";
 import { ApiError } from "@/lib/api";
 
 export default function RegisterPage() {
@@ -61,9 +62,11 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-black px-4 py-8">
-      <div className="w-full max-w-md">
-        <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-xl p-8 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-black flex flex-col diagonal-bg">
+      <AppHeader hideAuthActions />
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md">
+          <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-xl p-8 space-y-6">
           {/* Header */}
           <div className="text-center">
             <h1 className="text-3xl font-bold text-zinc-900 dark:text-white">
@@ -195,6 +198,7 @@ export default function RegisterPage() {
             >
               Sign in
             </a>
+          </div>
           </div>
         </div>
       </div>
