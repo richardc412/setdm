@@ -8,6 +8,9 @@ from .schemas import (
     Message,
     ChatAttendeeListResponse,
     MessageSentResponse,
+    WebhookCreateRequest,
+    WebhookCreatedResponse,
+    WebhookListResponse,
 )
 
 
@@ -279,6 +282,112 @@ class UnipileClient:
             response_data = response.json()
 
             return MessageSentResponse(**response_data)
+
+    async def create_webhook(
+        self,
+        request_url: str,
+        source: str = "messaging",
+        name: Optional[str] = None,
+        format: str = "json",
+        account_ids: Optional[list[str]] = None,
+        enabled: bool = True,
+        events: Optional[list[str]] = None,
+    ) -> WebhookCreatedResponse:
+        """
+        Create a webhook in Unipile.
+
+        Args:
+            request_url: The URL where Unipile will send webhook events
+            source: The webhook source type (default: "messaging")
+            name: Optional name for the webhook
+            format: Data format - "json" or "form" (default: "json")
+            account_ids: Optional list of account IDs to target
+            enabled: Whether the webhook is enabled (default: True)
+            events: List of events to subscribe to (default: ["message_received"])
+
+        Returns:
+            WebhookCreatedResponse containing the webhook_id
+
+        Raises:
+            httpx.HTTPStatusError: If the API returns an error status
+            httpx.RequestError: If there's a network/connection error
+        """
+        url = f"{self.base_url}/api/v1/webhooks"
+
+        # Set default events if not provided
+        if events is None:
+            events = ["message_received"]
+
+        webhook_data = WebhookCreateRequest(
+            request_url=request_url,
+            source=source,
+            name=name,
+            format=format,
+            account_ids=account_ids,
+            enabled=enabled,
+            events=events,
+        )
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url,
+                headers=self.headers,
+                json=webhook_data.model_dump(exclude_none=True),
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            return WebhookCreatedResponse(**data)
+
+    async def list_webhooks(self) -> WebhookListResponse:
+        """
+        List all webhooks configured in Unipile.
+
+        Returns:
+            WebhookListResponse containing list of webhooks
+
+        Raises:
+            httpx.HTTPStatusError: If the API returns an error status
+            httpx.RequestError: If there's a network/connection error
+        """
+        url = f"{self.base_url}/api/v1/webhooks"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                url,
+                headers=self.headers,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            return WebhookListResponse(**data)
+
+    async def delete_webhook(self, webhook_id: str) -> dict:
+        """
+        Delete a webhook from Unipile.
+
+        Args:
+            webhook_id: The ID of the webhook to delete
+
+        Returns:
+            Response dict from Unipile
+
+        Raises:
+            httpx.HTTPStatusError: If the API returns an error status
+            httpx.RequestError: If there's a network/connection error
+        """
+        url = f"{self.base_url}/api/v1/webhooks/{webhook_id}"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.delete(
+                url,
+                headers=self.headers,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            return response.json()
 
 
 def get_unipile_client() -> UnipileClient:

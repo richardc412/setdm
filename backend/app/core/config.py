@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     unipile_dsn: str = ""
     unipile_api_key: str = ""
     
+    # Webhook Settings
+    webhook_base_url: str = ""  # e.g., "https://yourdomain.com" or ngrok URL
+    
     # Database Settings
     database_url: str = "postgresql+asyncpg://user:password@localhost:5432/setdm_db"
     

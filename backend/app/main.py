@@ -10,9 +10,11 @@ from app.features.auth import auth_router
 from app.features.example import example_router
 from app.integration.unipile import unipile_router
 from app.features.chats.router import router as chats_router
+from app.features.webhooks import webhook_router
 from app.db.base import init_db, AsyncSessionLocal
 from app.services.message_sync import sync_all_chat_messages
 from app.services.pending_message_processor import process_pending_messages
+from app.services.webhook_manager import ensure_webhook_exists
 
 # Configure logging
 logging.basicConfig(
@@ -39,6 +41,18 @@ async def lifespan(app: FastAPI):
         logger.info("Initializing database tables...")
         await init_db()
         logger.info("Database tables initialized successfully")
+        
+        # Ensure webhook exists in Unipile for real-time message ingestion
+        logger.info("Ensuring webhook exists in Unipile...")
+        try:
+            webhook_id = await ensure_webhook_exists()
+            if webhook_id:
+                logger.info(f"Webhook ready: ID={webhook_id}")
+            else:
+                logger.warning("Webhook not configured - real-time message ingestion disabled")
+        except Exception as e:
+            logger.error(f"Failed to setup webhook: {str(e)}")
+            logger.warning("Application will continue without real-time webhook support")
         
         # Sync messages from Unipile on startup
         logger.info("Starting message sync from Unipile...")
@@ -90,6 +104,7 @@ app.include_router(auth_router)
 app.include_router(example_router)
 app.include_router(unipile_router)
 app.include_router(chats_router)
+app.include_router(webhook_router)
 
 
 @app.get("/health")

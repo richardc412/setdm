@@ -261,3 +261,96 @@ class MessageSentResponse(BaseModel):
             return v[0]
         return v
 
+
+# Webhook Types
+
+class WebhookHeader(BaseModel):
+    """Header for webhook requests."""
+    key: str
+    value: str
+
+
+class WebhookCreateRequest(BaseModel):
+    """
+    Request model for creating a webhook.
+    """
+    request_url: str
+    source: str  # "messaging"
+    name: Optional[str] = None
+    format: str = "json"  # "json" or "form"
+    account_ids: Optional[list[str]] = None
+    enabled: bool = True
+    headers: Optional[list[WebhookHeader]] = None
+    events: Optional[list[str]] = None  # ["message_received", etc.]
+
+
+class WebhookCreatedResponse(BaseModel):
+    """
+    Response model from webhook creation endpoint.
+    """
+    object: str  # "WebhookCreated"
+    webhook_id: str
+
+
+class WebhookListItem(BaseModel):
+    """
+    Single webhook item in list response.
+    """
+    id: str
+    request_url: str
+    source: str
+    name: Optional[str] = None
+    format: str
+    enabled: bool
+    events: Optional[list[str]] = None
+
+
+class WebhookListResponse(BaseModel):
+    """
+    Response model for listing webhooks.
+    """
+    object: str  # "WebhookList"
+    items: list[WebhookListItem]
+
+
+class WebhookSenderInfo(BaseModel):
+    """Sender information in webhook payload."""
+    id: str
+    provider_id: str
+    name: str
+    picture_url: Optional[str] = None
+
+
+class WebhookAccountInfo(BaseModel):
+    """Account information in webhook payload."""
+    id: str
+    provider_id: str
+    username: Optional[str] = None
+
+
+class WebhookMessagePayload(BaseModel):
+    """
+    Incoming webhook payload for message_received event.
+    This represents the data structure sent by Unipile to our webhook endpoint.
+    """
+    account_id: str
+    account_type: str
+    account_info: Optional[WebhookAccountInfo] = None
+    chat_id: str
+    timestamp: str
+    webhook_name: Optional[str] = None
+    message_id: str
+    message: Optional[str] = None  # Message text
+    sender: Optional[WebhookSenderInfo] = None
+    attendees: Optional[list[Any]] = None
+    attachments: Optional[list[Any]] = None
+    subject: Optional[str] = None
+    provider_chat_id: str
+    provider_message_id: str
+    is_event: Optional[int] = None
+    quoted: Optional[Any] = None
+    chat_content_type: Optional[str] = None
+    message_type: Optional[str] = None
+    is_group: Optional[int] = None
+    folder: Optional[str] = None
+
