@@ -152,8 +152,63 @@ class ChatAttendeeModel(Base):
         return f"<ChatAttendeeModel(id={self.id}, name={self.name}, provider_id={self.provider_id})>"
 
 
+class PendingMessageModel(Base):
+    """
+    Pending message model for storing recently sent messages awaiting sync.
+    These are messages sent via Unipile that haven't been synced to the messages table yet.
+    """
+    __tablename__ = "pending_messages"
+
+    # Primary key - auto-increment
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    
+    # Message ID from Unipile response
+    message_id: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    
+    # Foreign key to chat
+    chat_id: Mapped[str] = mapped_column(
+        String, 
+        ForeignKey("chats.id", ondelete="CASCADE"), 
+        nullable=False,
+        index=True
+    )
+    
+    # Message content
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    
+    # Timestamp when message was sent
+    timestamp: Mapped[str] = mapped_column(String, nullable=False, index=True)  # ISO 8601
+    
+    # Status tracking
+    status: Mapped[str] = mapped_column(
+        String, 
+        nullable=False, 
+        default="pending",
+        index=True
+    )  # 'pending', 'synced', 'failed'
+    
+    # Sync attempt counter
+    sync_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False
+    )
+    
+    # Relationship to chat
+    chat: Mapped["ChatModel"] = relationship("ChatModel")
+
+    def __repr__(self) -> str:
+        return f"<PendingMessageModel(id={self.id}, message_id={self.message_id}, status={self.status})>"
+
+
 # Create indexes for common queries
 Index("idx_messages_chat_timestamp", MessageModel.chat_id, MessageModel.timestamp)
 Index("idx_chats_account_updated", ChatModel.account_id, ChatModel.updated_at)
 Index("idx_attendees_provider", ChatAttendeeModel.provider_id)
+Index("idx_pending_messages_status_created", PendingMessageModel.status, PendingMessageModel.created_at)
 

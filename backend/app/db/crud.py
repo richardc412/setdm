@@ -1,12 +1,12 @@
 """CRUD operations for chats and messages."""
 from typing import Optional, Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import select, desc, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import ChatModel, MessageModel, ChatAttendeeModel
+from app.db.models import ChatModel, MessageModel, ChatAttendeeModel, PendingMessageModel
 from app.integration.unipile.schemas import Chat, Message
 
 
@@ -192,6 +192,26 @@ async def mark_chat_as_unread(
         await db.commit()
         await db.refresh(chat)
     return chat
+
+
+async def get_message_by_id(
+    db: AsyncSession,
+    message_id: str,
+) -> Optional[MessageModel]:
+    """
+    Get a message by its ID.
+    
+    Args:
+        db: Database session
+        message_id: Message ID to look up
+        
+    Returns:
+        MessageModel instance or None if not found
+    """
+    result = await db.execute(
+        select(MessageModel).where(MessageModel.id == message_id)
+    )
+    return result.scalar_one_or_none()
 
 
 async def create_message(
@@ -435,4 +455,174 @@ async def get_attendees_by_account(
         .order_by(ChatAttendeeModel.name)
     )
     return result.scalars().all()
+
+
+# =============================================================================
+# Pending Message CRUD Operations
+# =============================================================================
+
+
+async def create_pending_message(
+    db: AsyncSession,
+    message_id: str,
+    chat_id: str,
+    text: Optional[str],
+    timestamp: str,
+) -> PendingMessageModel:
+    """
+    Create a pending message after successful send to Unipile.
+    
+    Args:
+        db: Database session
+        message_id: Message ID from Unipile response
+        chat_id: Chat ID
+        text: Message text content
+        timestamp: ISO 8601 timestamp
+        
+    Returns:
+        PendingMessageModel instance
+    """
+    pending_message = PendingMessageModel(
+        message_id=message_id,
+        chat_id=chat_id,
+        text=text,
+        timestamp=timestamp,
+        status="pending",
+        sync_attempts=0,
+    )
+    db.add(pending_message)
+    await db.commit()
+    await db.refresh(pending_message)
+    return pending_message
+
+
+async def get_pending_messages(
+    db: AsyncSession,
+    chat_id: Optional[str] = None,
+    older_than_seconds: Optional[int] = None,
+    status: str = "pending",
+) -> Sequence[PendingMessageModel]:
+    """
+    Get pending messages, optionally filtered by chat and age.
+    
+    Args:
+        db: Database session
+        chat_id: Optional chat ID to filter by
+        older_than_seconds: Only get messages older than this many seconds
+        status: Status filter (default: 'pending')
+        
+    Returns:
+        List of PendingMessageModel instances
+    """
+    query = select(PendingMessageModel).where(PendingMessageModel.status == status)
+    
+    if chat_id:
+        query = query.where(PendingMessageModel.chat_id == chat_id)
+    
+    if older_than_seconds is not None:
+        cutoff_time = datetime.utcnow() - timedelta(seconds=older_than_seconds)
+        query = query.where(PendingMessageModel.created_at <= cutoff_time)
+    
+    query = query.order_by(PendingMessageModel.created_at)
+    
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def mark_pending_as_synced(
+    db: AsyncSession,
+    message_id: str,
+) -> Optional[PendingMessageModel]:
+    """
+    Mark a pending message as synced.
+    
+    Args:
+        db: Database session
+        message_id: Message ID to mark as synced
+        
+    Returns:
+        Updated PendingMessageModel or None if not found
+    """
+    result = await db.execute(
+        select(PendingMessageModel).where(PendingMessageModel.message_id == message_id)
+    )
+    pending_message = result.scalar_one_or_none()
+    
+    if pending_message:
+        pending_message.status = "synced"
+        pending_message.updated_at = datetime.utcnow()
+        await db.commit()
+        await db.refresh(pending_message)
+    
+    return pending_message
+
+
+async def increment_sync_attempts(
+    db: AsyncSession,
+    message_id: str,
+    max_attempts: int = 3,
+) -> Optional[PendingMessageModel]:
+    """
+    Increment sync attempts for a pending message.
+    Mark as failed if max attempts reached.
+    
+    Args:
+        db: Database session
+        message_id: Message ID
+        max_attempts: Maximum attempts before marking as failed
+        
+    Returns:
+        Updated PendingMessageModel or None if not found
+    """
+    result = await db.execute(
+        select(PendingMessageModel).where(PendingMessageModel.message_id == message_id)
+    )
+    pending_message = result.scalar_one_or_none()
+    
+    if pending_message:
+        pending_message.sync_attempts += 1
+        pending_message.updated_at = datetime.utcnow()
+        
+        if pending_message.sync_attempts >= max_attempts:
+            pending_message.status = "failed"
+        
+        await db.commit()
+        await db.refresh(pending_message)
+    
+    return pending_message
+
+
+async def delete_synced_pending_messages(
+    db: AsyncSession,
+    older_than_hours: int = 24,
+) -> int:
+    """
+    Delete synced pending messages older than specified hours.
+    Cleanup job to prevent table bloat.
+    
+    Args:
+        db: Database session
+        older_than_hours: Delete synced messages older than this many hours
+        
+    Returns:
+        Number of deleted messages
+    """
+    cutoff_time = datetime.utcnow() - timedelta(hours=older_than_hours)
+    
+    result = await db.execute(
+        select(PendingMessageModel)
+        .where(
+            and_(
+                PendingMessageModel.status == "synced",
+                PendingMessageModel.updated_at <= cutoff_time
+            )
+        )
+    )
+    messages_to_delete = result.scalars().all()
+    
+    for message in messages_to_delete:
+        await db.delete(message)
+    
+    await db.commit()
+    return len(messages_to_delete)
 

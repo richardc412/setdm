@@ -14,6 +14,7 @@ from app.db.crud import (
     get_message_count_by_chat,
     get_attendee_by_provider_id,
     upsert_attendee,
+    get_pending_messages,
 )
 from app.services.message_sync import sync_chat_messages, sync_all_chat_messages
 from app.integration.unipile.client import get_unipile_client
@@ -128,8 +129,8 @@ async def list_chat_messages(
         if not chat:
             raise HTTPException(status_code=404, detail=f"Chat {chat_id} not found")
         
-        # Get messages
-        messages = await get_messages_by_chat(
+        # Get synced messages
+        synced_messages = await get_messages_by_chat(
             db,
             chat_id=chat_id,
             limit=limit,
@@ -137,15 +138,56 @@ async def list_chat_messages(
             order_desc=order_desc,
         )
         
-        # Get total count
-        total_count = await get_message_count_by_chat(db, chat_id)
+        # Get pending messages for this chat
+        pending_messages = await get_pending_messages(
+            db,
+            chat_id=chat_id,
+            status="pending",
+        )
         
-        # Convert to response models
-        message_responses = [MessageResponse.model_validate(msg) for msg in messages]
+        # Merge pending and synced messages
+        # Filter out pending messages that already exist in synced
+        synced_ids = {msg.id for msg in synced_messages}
+        unique_pending = [p for p in pending_messages if p.message_id not in synced_ids]
+        
+        # Convert pending messages to MessageResponse format
+        pending_responses = []
+        for pending_msg in unique_pending:
+            pending_responses.append(MessageResponse(
+                id=pending_msg.message_id,
+                account_id="",  # Not available in pending
+                chat_id=pending_msg.chat_id,
+                provider_id=pending_msg.message_id,
+                sender_id="self",
+                sender_attendee_id="self",
+                text=pending_msg.text,
+                timestamp=pending_msg.timestamp,
+                is_sender=1,
+                attachments=[],
+                reactions=[],
+                seen=0,
+                hidden=0,
+                deleted=0,
+                edited=0,
+                is_event=0,
+                delivered=1,
+                created_at=pending_msg.created_at,
+            ))
+        
+        # Merge synced and pending messages
+        synced_responses = [MessageResponse.model_validate(msg) for msg in synced_messages]
+        all_messages = synced_responses + pending_responses
+        
+        # Sort by timestamp
+        all_messages.sort(key=lambda m: m.timestamp, reverse=order_desc)
+        
+        # Get total count (synced + unique pending)
+        total_count = await get_message_count_by_chat(db, chat_id)
+        total_with_pending = total_count + len(unique_pending)
         
         return MessageListResponse(
-            items=message_responses,
-            total=total_count,
+            items=all_messages,
+            total=total_with_pending,
             limit=limit,
             offset=offset,
         )

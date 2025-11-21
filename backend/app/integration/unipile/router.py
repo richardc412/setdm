@@ -1,11 +1,12 @@
 from typing import Optional
 import logging
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, Path, File, Form, UploadFile, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from .client import list_all_chats, list_chat_messages, send_message, get_unipile_client
 from .schemas import ChatListResponse, MessageListResponse, MessageSentResponse
 from app.db.base import get_db
-from app.services.message_sync import sync_chat_messages
+from app.db.crud import create_pending_message
 
 logger = logging.getLogger(__name__)
 
@@ -315,14 +316,22 @@ async def send_message_in_chat(
             typing_duration=typing_duration,
         )
         
-        # Trigger sync after successful message send to update database
+        # Add message to pending queue for batch processing
         try:
-            logger.info(f"Triggering message sync for chat {chat_id} after successful send")
-            await sync_chat_messages(db, chat_id, full_sync=False)
-            logger.info(f"Message sync completed for chat {chat_id}")
-        except Exception as sync_error:
-            # Log but don't fail the request if sync fails
-            logger.warning(f"Failed to sync messages after send for chat {chat_id}: {str(sync_error)}")
+            if response.message_id:
+                await create_pending_message(
+                    db=db,
+                    message_id=response.message_id,
+                    chat_id=chat_id,
+                    text=text,
+                    timestamp=datetime.utcnow().isoformat() + 'Z',
+                )
+                logger.info(f"Added message {response.message_id} to pending queue for chat {chat_id}")
+            else:
+                logger.warning(f"Message sent to chat {chat_id} but no message_id returned")
+        except Exception as queue_error:
+            # Log but don't fail the request if queuing fails
+            logger.error(f"Failed to queue message for chat {chat_id}: {str(queue_error)}")
         
         return response
     except ValueError as e:
