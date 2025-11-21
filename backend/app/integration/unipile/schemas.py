@@ -2,6 +2,40 @@ from typing import Optional, Any, Union
 from pydantic import BaseModel
 
 
+# Chat Attendee Types
+
+class InstagramSpecifics(BaseModel):
+    """Instagram-specific attendee data."""
+    provider: str  # "INSTAGRAM"
+    public_identifier: str
+    relationship_status: dict[str, bool]
+
+
+class ChatAttendee(BaseModel):
+    """
+    Chat attendee model containing profile information.
+    """
+    object: str  # "ChatAttendee"
+    id: str
+    account_id: str
+    provider_id: str
+    name: str
+    is_self: int  # 0 or 1
+    hidden: Optional[int] = None  # 0 or 1
+    picture_url: Optional[str] = None
+    profile_url: Optional[str] = None
+    specifics: Optional[InstagramSpecifics] = None
+
+
+class ChatAttendeeListResponse(BaseModel):
+    """
+    Response model for list attendees endpoint.
+    """
+    object: str  # "ChatAttendeeList"
+    items: list[ChatAttendee]
+    cursor: Optional[Any] = None
+
+
 class Chat(BaseModel):
     """
     Simplified Chat model containing only the essential fields.

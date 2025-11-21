@@ -115,7 +115,45 @@ class MessageModel(Base):
         return f"<MessageModel(id={self.id}, chat_id={self.chat_id}, timestamp={self.timestamp})>"
 
 
+class ChatAttendeeModel(Base):
+    """
+    Chat attendee model for storing profile information.
+    Caches attendee data including profile pictures.
+    """
+    __tablename__ = "chat_attendees"
+
+    # Primary key - from Unipile
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    
+    # Core Unipile fields
+    account_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    provider_id: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    is_self: Mapped[int] = mapped_column(Integer, nullable=False)  # 0 or 1
+    hidden: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    
+    # Profile information
+    picture_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    profile_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    
+    # Instagram specifics stored as JSON
+    specifics: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<ChatAttendeeModel(id={self.id}, name={self.name}, provider_id={self.provider_id})>"
+
+
 # Create indexes for common queries
 Index("idx_messages_chat_timestamp", MessageModel.chat_id, MessageModel.timestamp)
 Index("idx_chats_account_updated", ChatModel.account_id, ChatModel.updated_at)
+Index("idx_attendees_provider", ChatAttendeeModel.provider_id)
 

@@ -12,8 +12,11 @@ from app.db.crud import (
     get_messages_by_chat,
     mark_chat_as_read,
     get_message_count_by_chat,
+    get_attendee_by_provider_id,
+    upsert_attendee,
 )
 from app.services.message_sync import sync_chat_messages, sync_all_chat_messages
+from app.integration.unipile.client import get_unipile_client
 from app.features.chats.schemas import (
     ChatResponse,
     ChatListResponse,
@@ -249,4 +252,65 @@ async def sync_all_chats(
     except Exception as e:
         logger.error(f"Error syncing all chats: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to sync chats: {str(e)}")
+
+
+@router.get("/{chat_id}/attendee/{provider_id}")
+async def get_chat_attendee(
+    chat_id: str,
+    provider_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get attendee information including profile picture.
+    
+    First checks the database cache, if not found, fetches from Unipile and caches it.
+    
+    Path parameters:
+    - chat_id: Chat ID
+    - provider_id: Provider ID of the attendee (e.g., Instagram user ID)
+    
+    Returns:
+    - Attendee information including picture_url
+    """
+    try:
+        # Try to get from cache first
+        attendee = await get_attendee_by_provider_id(db, provider_id)
+        
+        if attendee:
+            # Return cached data
+            return {
+                "id": attendee.id,
+                "provider_id": attendee.provider_id,
+                "name": attendee.name,
+                "picture_url": attendee.picture_url,
+                "profile_url": attendee.profile_url,
+                "is_self": attendee.is_self,
+            }
+        
+        # Not in cache, fetch from Unipile
+        client = get_unipile_client()
+        response = await client.list_chat_attendees(chat_id)
+        
+        # Find the specific attendee
+        for attendee_data in response.items:
+            if attendee_data.provider_id == provider_id:
+                # Cache it
+                cached_attendee = await upsert_attendee(db, attendee_data)
+                
+                return {
+                    "id": cached_attendee.id,
+                    "provider_id": cached_attendee.provider_id,
+                    "name": cached_attendee.name,
+                    "picture_url": cached_attendee.picture_url,
+                    "profile_url": cached_attendee.profile_url,
+                    "is_self": cached_attendee.is_self,
+                }
+        
+        raise HTTPException(status_code=404, detail=f"Attendee {provider_id} not found in chat {chat_id}")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching attendee {provider_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch attendee: {str(e)}")
 

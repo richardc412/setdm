@@ -165,3 +165,35 @@ async def get_chat_messages(
             detail=f"Failed to fetch messages from Unipile: {str(e)}"
         )
 
+
+@router.get("/chats/{chat_id}/attendees")
+async def list_chat_attendees(
+    chat_id: str,
+):
+    """
+    List all attendees from a chat.
+    
+    Returns profile information including picture_url for each attendee.
+    Useful for displaying profile pictures in the frontend.
+    
+    Args:
+        chat_id: The id of the chat
+        
+    Returns:
+        ChatAttendeeListResponse with attendee information
+    """
+    try:
+        client = get_unipile_client()
+        response = await client.list_chat_attendees(chat_id)
+        return response
+    except ValueError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Configuration error: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch attendees from Unipile: {str(e)}"
+        )
+

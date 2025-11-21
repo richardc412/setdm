@@ -6,7 +6,7 @@ from sqlalchemy import select, desc, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import ChatModel, MessageModel
+from app.db.models import ChatModel, MessageModel, ChatAttendeeModel
 from app.integration.unipile.schemas import Chat, Message
 
 
@@ -340,4 +340,99 @@ async def get_message_count_by_chat(
         .where(MessageModel.chat_id == chat_id)
     )
     return result.scalar_one()
+
+
+async def upsert_attendee(
+    db: AsyncSession,
+    attendee_data: any,
+) -> ChatAttendeeModel:
+    """
+    Create or update a chat attendee.
+    
+    Args:
+        db: Database session
+        attendee_data: ChatAttendee data from Unipile API
+        
+    Returns:
+        ChatAttendeeModel instance
+    """
+    # Try to get existing attendee
+    result = await db.execute(
+        select(ChatAttendeeModel).where(ChatAttendeeModel.id == attendee_data.id)
+    )
+    attendee = result.scalar_one_or_none()
+    
+    # Convert specifics to dict if it exists
+    specifics_dict = attendee_data.specifics.model_dump() if attendee_data.specifics else None
+    
+    if attendee:
+        # Update existing attendee
+        attendee.name = attendee_data.name
+        attendee.picture_url = attendee_data.picture_url
+        attendee.profile_url = attendee_data.profile_url
+        attendee.specifics = specifics_dict
+        attendee.hidden = attendee_data.hidden
+        attendee.updated_at = datetime.utcnow()
+        await db.commit()
+        await db.refresh(attendee)
+    else:
+        # Create new attendee
+        attendee = ChatAttendeeModel(
+            id=attendee_data.id,
+            account_id=attendee_data.account_id,
+            provider_id=attendee_data.provider_id,
+            name=attendee_data.name,
+            is_self=attendee_data.is_self,
+            hidden=attendee_data.hidden,
+            picture_url=attendee_data.picture_url,
+            profile_url=attendee_data.profile_url,
+            specifics=specifics_dict,
+        )
+        db.add(attendee)
+        await db.commit()
+        await db.refresh(attendee)
+    
+    return attendee
+
+
+async def get_attendee_by_provider_id(
+    db: AsyncSession,
+    provider_id: str,
+) -> Optional[ChatAttendeeModel]:
+    """
+    Get attendee by provider ID.
+    
+    Args:
+        db: Database session
+        provider_id: Provider ID (e.g., Instagram user ID)
+        
+    Returns:
+        ChatAttendeeModel instance or None if not found
+    """
+    result = await db.execute(
+        select(ChatAttendeeModel).where(ChatAttendeeModel.provider_id == provider_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_attendees_by_account(
+    db: AsyncSession,
+    account_id: str,
+) -> Sequence[ChatAttendeeModel]:
+    """
+    Get all attendees for an account.
+    
+    Args:
+        db: Database session
+        account_id: Account ID
+        
+    Returns:
+        List of ChatAttendeeModel instances
+    """
+    result = await db.execute(
+        select(ChatAttendeeModel)
+        .where(ChatAttendeeModel.account_id == account_id)
+        .order_by(ChatAttendeeModel.name)
+    )
+    return result.scalars().all()
 

@@ -4,7 +4,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getChats, Chat, ChatFilters, getChatMessages, Message, markChatAsRead } from "@/lib/api";
+import {
+  getChats,
+  Chat,
+  ChatFilters,
+  getChatMessages,
+  Message,
+  markChatAsRead,
+  getChatAttendee,
+  Attendee,
+} from "@/lib/api";
 import { MessageList } from "@/components/MessageList";
 
 export default function ChatsPage() {
@@ -19,21 +28,26 @@ export default function ChatsPage() {
     offset: 0,
   });
   const [hasMore, setHasMore] = useState(false);
-  
+
   // Message state
   const [messages, setMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messagesError, setMessagesError] = useState<string | null>(null);
 
+  // Profile picture cache
+  const [profilePictures, setProfilePictures] = useState<
+    Record<string, string>
+  >({});
+
   const loadChats = async (loadMore = false) => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const offset = loadMore ? chats.length : 0;
       const filterParams = { ...filters, offset };
       const response = await getChats(filterParams);
-      
+
       // Sort chats: unread first, then by timestamp (newest first)
       const sortedChats = response.items.sort((a, b) => {
         // First, sort by read status (unread first)
@@ -45,13 +59,15 @@ export default function ChatsPage() {
         const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
         return timeB - timeA;
       });
-      
+
       if (loadMore) {
         setChats((prev) => [...prev, ...sortedChats]);
       } else {
         setChats(sortedChats);
+        // Fetch profile pictures for new chats
+        fetchProfilePictures(sortedChats);
       }
-      
+
       // Check if there are more chats to load
       setHasMore(response.items.length === filters.limit);
     } catch (err) {
@@ -62,27 +78,50 @@ export default function ChatsPage() {
     }
   };
 
+  const fetchProfilePictures = async (chatsToFetch: Chat[]) => {
+    // Fetch profile pictures for chats (in background, don't block UI)
+    for (const chat of chatsToFetch) {
+      // Skip if already cached
+      if (profilePictures[chat.provider_id]) continue;
+
+      try {
+        const attendee = await getChatAttendee(chat.id, chat.provider_id);
+        if (attendee.picture_url) {
+          setProfilePictures((prev) => ({
+            ...prev,
+            [chat.provider_id]: attendee.picture_url!,
+          }));
+        }
+      } catch (err) {
+        // Silently fail - will use fallback avatar
+        console.log(`Could not fetch profile picture for ${chat.provider_id}`);
+      }
+    }
+  };
+
   const loadMessages = async (chatId: string) => {
     try {
       setMessagesLoading(true);
       setMessagesError(null);
-      
-      const response = await getChatMessages(chatId, { 
+
+      const response = await getChatMessages(chatId, {
         limit: 100,
-        order_desc: false // Get oldest first for better UX
+        order_desc: false, // Get oldest first for better UX
       });
-      
+
       setMessages(response.items);
-      
+
       // Scroll to bottom after loading messages
       setTimeout(() => {
-        const messagesContainer = document.getElementById('messages-container');
+        const messagesContainer = document.getElementById("messages-container");
         if (messagesContainer) {
           messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
       }, 100);
     } catch (err) {
-      setMessagesError(err instanceof Error ? err.message : "Failed to load messages");
+      setMessagesError(
+        err instanceof Error ? err.message : "Failed to load messages"
+      );
       console.error("Error loading messages:", err);
     } finally {
       setMessagesLoading(false);
@@ -92,16 +131,14 @@ export default function ChatsPage() {
   const handleChatSelect = async (chat: Chat) => {
     setSelectedChat(chat);
     loadMessages(chat.id);
-    
+
     // Mark chat as read if it's unread
     if (!chat.is_read) {
       try {
         await markChatAsRead(chat.id);
         // Update the chat in the local state
         setChats((prevChats) =>
-          prevChats.map((c) =>
-            c.id === chat.id ? { ...c, is_read: true } : c
-          )
+          prevChats.map((c) => (c.id === chat.id ? { ...c, is_read: true } : c))
         );
       } catch (err) {
         console.error("Failed to mark chat as read:", err);
@@ -250,51 +287,74 @@ export default function ChatsPage() {
                 </div>
               ) : (
                 <>
-                  {chats.map((chat) => (
-                    <button
-                      key={chat.id}
-                      onClick={() => handleChatSelect(chat)}
-                      className={`w-full p-4 border-b border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all text-left ${
-                        selectedChat?.id === chat.id
-                          ? "bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-600"
-                          : ""
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="relative flex-shrink-0">
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xl font-bold shadow-lg">
-                            {chat.name?.charAt(0).toUpperCase() || "?"}
+                  {chats.map((chat) => {
+                    const profilePic = profilePictures[chat.provider_id];
+
+                    return (
+                      <button
+                        key={chat.id}
+                        onClick={() => handleChatSelect(chat)}
+                        className={`w-full p-4 border-b border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all text-left ${
+                          selectedChat?.id === chat.id
+                            ? "bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-600"
+                            : ""
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="relative flex-shrink-0">
+                            {profilePic ? (
+                              <img
+                                src={profilePic}
+                                alt={chat.name || "Profile"}
+                                className="w-12 h-12 rounded-full object-cover shadow-lg"
+                                onError={(e) => {
+                                  // Fallback to gradient avatar if image fails to load
+                                  e.currentTarget.style.display = "none";
+                                  const fallback = e.currentTarget
+                                    .nextElementSibling as HTMLElement;
+                                  if (fallback) fallback.style.display = "flex";
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xl font-bold shadow-lg"
+                              style={{ display: profilePic ? "none" : "flex" }}
+                            >
+                              {chat.name?.charAt(0).toUpperCase() || "?"}
+                            </div>
+                            {!chat.is_read && (
+                              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-600 border-2 border-white dark:border-zinc-900"></span>
+                            )}
                           </div>
-                          {!chat.is_read && (
-                            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-600 border-2 border-white dark:border-zinc-900"></span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <h3
-                              className={`font-semibold truncate ${
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <h3
+                                className={`font-semibold truncate ${
+                                  !chat.is_read
+                                    ? "text-zinc-900 dark:text-white"
+                                    : "text-zinc-700 dark:text-zinc-300"
+                                }`}
+                              >
+                                {chat.name || "Unnamed Chat"}
+                              </h3>
+                              <span className="text-xs text-zinc-500 dark:text-zinc-400 flex-shrink-0">
+                                {formatTimestamp(chat.timestamp)}
+                              </span>
+                            </div>
+                            <p
+                              className={`text-sm truncate ${
                                 !chat.is_read
-                                  ? "text-zinc-900 dark:text-white"
-                                  : "text-zinc-700 dark:text-zinc-300"
+                                  ? "text-zinc-600 dark:text-zinc-300 font-medium"
+                                  : "text-zinc-500 dark:text-zinc-400"
                               }`}
                             >
-                              {chat.name || "Unnamed Chat"}
-                            </h3>
-                            <span className="text-xs text-zinc-500 dark:text-zinc-400 flex-shrink-0">
-                              {formatTimestamp(chat.timestamp)}
-                            </span>
+                              {getLastMessagePreview(chat)}
+                            </p>
                           </div>
-                          <p className={`text-sm truncate ${
-                            !chat.is_read 
-                              ? "text-zinc-600 dark:text-zinc-300 font-medium" 
-                              : "text-zinc-500 dark:text-zinc-400"
-                          }`}>
-                            {getLastMessagePreview(chat)}
-                          </p>
                         </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                   {hasMore && (
                     <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
                       <button
@@ -318,16 +378,34 @@ export default function ChatsPage() {
                 {/* Chat Header */}
                 <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-3 shadow-lg">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-lg flex items-center justify-center text-white text-lg font-bold">
+                    {profilePictures[selectedChat.provider_id] ? (
+                      <img
+                        src={profilePictures[selectedChat.provider_id]}
+                        alt={selectedChat.name || "Profile"}
+                        className="w-10 h-10 rounded-full object-cover border-2 border-white/30 shadow-md"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                          const fallback = e.currentTarget
+                            .nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = "flex";
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-lg flex items-center justify-center text-white text-lg font-bold"
+                      style={{
+                        display: profilePictures[selectedChat.provider_id]
+                          ? "none"
+                          : "flex",
+                      }}
+                    >
                       {selectedChat.name?.charAt(0).toUpperCase() || "?"}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h2 className="text-base font-bold text-white truncate">
                         {selectedChat.name || "Unnamed Chat"}
                       </h2>
-                      <p className="text-xs text-white/80">
-                        Instagram
-                      </p>
+                      <p className="text-xs text-white/80">Instagram</p>
                     </div>
                   </div>
                 </div>
@@ -348,8 +426,14 @@ export default function ChatsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div id="messages-container" className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-900">
-                    <MessageList messages={messages} loading={messagesLoading} />
+                  <div
+                    id="messages-container"
+                    className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-900"
+                  >
+                    <MessageList
+                      messages={messages}
+                      loading={messagesLoading}
+                    />
                   </div>
                 )}
               </div>
@@ -374,4 +458,3 @@ export default function ChatsPage() {
     </ProtectedRoute>
   );
 }
-

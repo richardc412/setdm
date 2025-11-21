@@ -1,7 +1,7 @@
 from typing import Optional
 import httpx
 from app.core.config import get_settings
-from .schemas import ChatListResponse, Chat, MessageListResponse, Message
+from .schemas import ChatListResponse, Chat, MessageListResponse, Message, ChatAttendeeListResponse
 
 
 class UnipileClient:
@@ -167,6 +167,36 @@ class UnipileClient:
                 items=messages,
                 cursor=data.get("cursor"),
             )
+
+    async def list_chat_attendees(
+        self,
+        chat_id: str,
+    ) -> ChatAttendeeListResponse:
+        """
+        List all attendees from a chat.
+
+        Args:
+            chat_id: The id of the chat related to requested attendees
+
+        Returns:
+            ChatAttendeeListResponse containing attendee information including picture_url
+
+        Raises:
+            httpx.HTTPStatusError: If the API returns an error status
+            httpx.RequestError: If there's a network/connection error
+        """
+        url = f"{self.base_url}/api/v1/chats/{chat_id}/attendees"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                url,
+                headers=self.headers,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            return ChatAttendeeListResponse(**data)
 
 
 def get_unipile_client() -> UnipileClient:

@@ -203,6 +203,43 @@ export async function markChatAsRead(chatId: string): Promise<Chat> {
 }
 
 /**
+ * Attendee API Types
+ */
+export interface Attendee {
+  id: string;
+  provider_id: string;
+  name: string;
+  picture_url: string | null;
+  profile_url: string | null;
+  is_self: number;
+}
+
+/**
+ * Get attendee information including profile picture
+ */
+export async function getChatAttendee(
+  chatId: string,
+  providerId: string
+): Promise<Attendee> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/chats/${chatId}/attendee/${providerId}`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Failed to fetch attendee' }));
+    throw new ApiError(response.status, error.detail || 'Failed to fetch attendee');
+  }
+
+  return response.json();
+}
+
+/**
  * Message API Types and Functions
  */
 export interface Reaction {
