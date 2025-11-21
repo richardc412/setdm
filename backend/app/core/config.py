@@ -3,7 +3,8 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+# Go up three levels: config.py -> core/ -> app/ -> backend/
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ENV_FILE = BASE_DIR / ".env"
 
 

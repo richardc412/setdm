@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.features.auth import auth_router
 from app.features.example import example_router
+from app.integration.unipile import unipile_router
 
 app = FastAPI(title="SetDM API")
 
@@ -18,6 +19,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router)
 app.include_router(example_router)
+app.include_router(unipile_router)
 
 
 @app.get("/health")
