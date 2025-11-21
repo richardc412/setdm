@@ -11,6 +11,7 @@ from app.features.example import example_router
 from app.integration.unipile import unipile_router
 from app.features.chats.router import router as chats_router
 from app.features.webhooks import webhook_router
+from app.features.realtime.router import router as realtime_router
 from app.db.base import init_db, AsyncSessionLocal
 from app.services.message_sync import sync_all_chat_messages
 from app.services.pending_message_processor import process_pending_messages
@@ -105,6 +106,7 @@ app.include_router(example_router)
 app.include_router(unipile_router)
 app.include_router(chats_router)
 app.include_router(webhook_router)
+app.include_router(realtime_router)
 
 
 @app.get("/health")
