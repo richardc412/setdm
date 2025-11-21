@@ -91,6 +91,7 @@ async def process_webhook_message(db: AsyncSession, payload: WebhookMessagePaylo
     
     # Convert webhook payload to Message schema
     # Note: Webhook provides simplified data, so we'll use defaults for missing fields
+    # Use provider_id as sender_id to ensure consistency with chat_attendees table
     message_data = Message(
         object="Message",
         id=payload.message_id,
@@ -98,7 +99,7 @@ async def process_webhook_message(db: AsyncSession, payload: WebhookMessagePaylo
         chat_id=payload.chat_id,
         chat_provider_id=payload.provider_chat_id,
         provider_id=payload.provider_message_id,
-        sender_id=payload.sender.id if payload.sender else "",
+        sender_id=payload.sender.provider_id if payload.sender and payload.sender.provider_id else (payload.sender.id if payload.sender else ""),
         sender_attendee_id=payload.sender.id if payload.sender else "",
         text=payload.message,
         timestamp=payload.timestamp,

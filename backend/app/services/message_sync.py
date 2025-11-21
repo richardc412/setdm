@@ -71,8 +71,9 @@ async def sync_all_chats(db: AsyncSession, account_id: Optional[str] = None) -> 
                 needs_sync = False
                 
                 if not existing_chat:
-                    # New chat - just create it, don't sync messages on startup
+                    # New chat - mark for message sync
                     stats["chats_created"] += 1
+                    needs_sync = True
                 else:
                     # Existing chat - only sync if timestamp changed (new messages)
                     if chat_data.timestamp and chat_data.timestamp != existing_chat.timestamp:
@@ -106,6 +107,7 @@ async def sync_chat_messages(
     db: AsyncSession,
     chat_id: str,
     full_sync: bool = False,
+    max_pages: Optional[int] = None,
 ) -> dict:
     """
     Sync messages for a specific chat from Unipile API.
@@ -118,6 +120,8 @@ async def sync_chat_messages(
         chat_id: Chat ID to sync messages for
         full_sync: If True, syncs all messages. If False (default), 
                    syncs only new messages since last sync.
+        max_pages: Maximum number of pages to fetch. If None, fetches all pages.
+                   Useful for limiting initial boot sync.
         
     Returns:
         Dictionary with sync statistics:
@@ -157,6 +161,7 @@ async def sync_chat_messages(
         cursor = None
         latest_timestamp = None
         has_new_unread = False
+        pages_fetched = 0
         
         while True:
             # Fetch messages from Unipile
@@ -167,7 +172,8 @@ async def sync_chat_messages(
                 limit=100,  # Max items per request
             )
             
-            logger.info(f"Fetched {len(response.items)} messages for chat {chat_id}")
+            pages_fetched += 1
+            logger.info(f"Fetched {len(response.items)} messages for chat {chat_id} (page {pages_fetched})")
             stats["messages_fetched"] += len(response.items)
             
             # Process each message
@@ -186,6 +192,11 @@ async def sync_chat_messages(
                     # Track latest timestamp
                     if not latest_timestamp or message_data.timestamp > latest_timestamp:
                         latest_timestamp = message_data.timestamp
+            
+            # Check if we should continue fetching
+            if max_pages and pages_fetched >= max_pages:
+                logger.info(f"Reached max_pages limit ({max_pages}) for chat {chat_id}")
+                break
             
             # Check if there are more pages
             if response.cursor:
@@ -215,6 +226,7 @@ async def sync_all_chat_messages(
     db: AsyncSession,
     account_id: Optional[str] = None,
     full_sync: bool = False,
+    max_pages_per_chat: Optional[int] = None,
 ) -> dict:
     """
     Sync messages for all chats.
@@ -226,6 +238,8 @@ async def sync_all_chat_messages(
         account_id: Optional account ID to filter chats
         full_sync: If True, performs full sync for all messages.
                    If False (default), performs incremental sync.
+        max_pages_per_chat: Maximum number of pages to fetch per chat.
+                           If None, fetches all pages. Useful for limiting initial boot sync.
         
     Returns:
         Dictionary with sync statistics:
@@ -266,7 +280,7 @@ async def sync_all_chat_messages(
     # Sync messages only for chats that need it
     for chat_id in chats_to_sync:
         try:
-            message_stats = await sync_chat_messages(db, chat_id, full_sync=full_sync)
+            message_stats = await sync_chat_messages(db, chat_id, full_sync=full_sync, max_pages=max_pages_per_chat)
             overall_stats["total_messages_created"] += message_stats["messages_created"]
             overall_stats["total_unread_messages"] += message_stats["new_unread_messages"]
             overall_stats["chats_checked_for_messages"] += 1

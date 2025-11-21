@@ -1,4 +1,5 @@
 """CRUD operations for chats and messages."""
+import logging
 from typing import Optional, Sequence
 from datetime import datetime, timedelta
 
@@ -8,6 +9,9 @@ from sqlalchemy.orm import selectinload
 
 from app.db.models import ChatModel, MessageModel, ChatAttendeeModel, PendingMessageModel
 from app.integration.unipile.schemas import Chat, Message
+
+
+logger = logging.getLogger(__name__)
 
 
 async def get_or_create_chat(
@@ -238,6 +242,13 @@ async def create_message(
     if existing_message:
         return None  # Message already exists, skip
     
+    # Resolve sender_id: use attendee's provider_id if available
+    resolved_sender_id = message_data.sender_id
+    if message_data.sender_attendee_id:
+        attendee = await get_attendee_by_id(db, message_data.sender_attendee_id)
+        if attendee and attendee.provider_id:
+            resolved_sender_id = attendee.provider_id
+    
     # Convert Pydantic models to dicts for JSON fields
     attachments = [att if isinstance(att, dict) else att.model_dump() for att in message_data.attachments]
     reactions = [r.model_dump() for r in message_data.reactions]
@@ -249,7 +260,7 @@ async def create_message(
         account_id=message_data.account_id,
         chat_provider_id=message_data.chat_provider_id,
         provider_id=message_data.provider_id,
-        sender_id=message_data.sender_id,
+        sender_id=resolved_sender_id,
         sender_attendee_id=message_data.sender_attendee_id,
         text=message_data.text,
         timestamp=message_data.timestamp,
@@ -413,6 +424,26 @@ async def upsert_attendee(
         await db.refresh(attendee)
     
     return attendee
+
+
+async def get_attendee_by_id(
+    db: AsyncSession,
+    attendee_id: str,
+) -> Optional[ChatAttendeeModel]:
+    """
+    Get attendee by their internal ID.
+    
+    Args:
+        db: Database session
+        attendee_id: Internal attendee ID
+        
+    Returns:
+        ChatAttendeeModel instance or None if not found
+    """
+    result = await db.execute(
+        select(ChatAttendeeModel).where(ChatAttendeeModel.id == attendee_id)
+    )
+    return result.scalar_one_or_none()
 
 
 async def get_attendee_by_provider_id(
