@@ -101,7 +101,8 @@ This document summarizes the PostgreSQL persistence layer implementation for Ins
 - Uses `after=timestamp` parameter in Unipile API
 - Syncs only new messages on subsequent runs
 - **Smart chat filtering**: Only syncs chats with changed timestamps
-- Skips chats with no new messages (huge API savings!)
+- Skips new chats and empty chats on startup (huge API savings!)
+- Use manual sync endpoint for initial population if needed
 - Minimizes API calls while keeping data fresh
 
 ### ✅ Startup Sync Process

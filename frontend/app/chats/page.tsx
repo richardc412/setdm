@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getChats, Chat, ChatFilters, getChatMessages, Message } from "@/lib/api";
+import { getChats, Chat, ChatFilters, getChatMessages, Message, markChatAsRead } from "@/lib/api";
 import { MessageList } from "@/components/MessageList";
 
 export default function ChatsPage() {
@@ -16,9 +16,9 @@ export default function ChatsPage() {
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [filters, setFilters] = useState<ChatFilters>({
     limit: 50,
-    account_type: "INSTAGRAM", // Only Instagram messages
+    offset: 0,
   });
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   
   // Message state
   const [messages, setMessages] = useState<Message[]>([]);
@@ -30,16 +30,30 @@ export default function ChatsPage() {
       setLoading(true);
       setError(null);
       
-      const filterParams = loadMore && cursor ? { ...filters, cursor } : filters;
+      const offset = loadMore ? chats.length : 0;
+      const filterParams = { ...filters, offset };
       const response = await getChats(filterParams);
       
+      // Sort chats: unread first, then by timestamp (newest first)
+      const sortedChats = response.items.sort((a, b) => {
+        // First, sort by read status (unread first)
+        if (a.is_read !== b.is_read) {
+          return a.is_read ? 1 : -1;
+        }
+        // Then sort by timestamp (newest first)
+        const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return timeB - timeA;
+      });
+      
       if (loadMore) {
-        setChats((prev) => [...prev, ...response.items]);
+        setChats((prev) => [...prev, ...sortedChats]);
       } else {
-        setChats(response.items);
+        setChats(sortedChats);
       }
       
-      setCursor(response.cursor);
+      // Check if there are more chats to load
+      setHasMore(response.items.length === filters.limit);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load chats");
       console.error("Error loading chats:", err);
@@ -53,10 +67,20 @@ export default function ChatsPage() {
       setMessagesLoading(true);
       setMessagesError(null);
       
-      const response = await getChatMessages(chatId, { limit: 20 });
+      const response = await getChatMessages(chatId, { 
+        limit: 100,
+        order_desc: false // Get oldest first for better UX
+      });
       
-      // Reverse to show oldest first (messages come in descending order)
-      setMessages(response.items.reverse());
+      setMessages(response.items);
+      
+      // Scroll to bottom after loading messages
+      setTimeout(() => {
+        const messagesContainer = document.getElementById('messages-container');
+        if (messagesContainer) {
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+      }, 100);
     } catch (err) {
       setMessagesError(err instanceof Error ? err.message : "Failed to load messages");
       console.error("Error loading messages:", err);
@@ -65,14 +89,30 @@ export default function ChatsPage() {
     }
   };
 
-  const handleChatSelect = (chat: Chat) => {
+  const handleChatSelect = async (chat: Chat) => {
     setSelectedChat(chat);
     loadMessages(chat.id);
+    
+    // Mark chat as read if it's unread
+    if (!chat.is_read) {
+      try {
+        await markChatAsRead(chat.id);
+        // Update the chat in the local state
+        setChats((prevChats) =>
+          prevChats.map((c) =>
+            c.id === chat.id ? { ...c, is_read: true } : c
+          )
+        );
+      } catch (err) {
+        console.error("Failed to mark chat as read:", err);
+        // Don't show error to user, this is a background operation
+      }
+    }
   };
 
   useEffect(() => {
     loadChats();
-  }, [filters.unread]);
+  }, [filters.is_read]);
 
   const handleLogout = async () => {
     await logout();
@@ -80,7 +120,7 @@ export default function ChatsPage() {
   };
 
   const handleFilterChange = (key: keyof ChatFilters, value: any) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+    setFilters((prev) => ({ ...prev, [key]: value, offset: 0 }));
     setSelectedChat(null);
   };
 
@@ -98,20 +138,27 @@ export default function ChatsPage() {
     const diffDays = Math.floor(diffMs / 86400000);
 
     if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays < 7) return `${diffDays}d`;
     return date.toLocaleDateString();
+  };
+
+  const getLastMessagePreview = (chat: Chat) => {
+    // Try to get the last message for this chat from our loaded messages
+    // For now, we'll just show a placeholder
+    // In a real app, you'd fetch this from the API or cache
+    return "Tap to view messages";
   };
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-zinc-50 dark:bg-black flex flex-col">
+      <div className="h-screen bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-black flex flex-col overflow-hidden">
         {/* Sticky Header */}
-        <header className="sticky top-0 z-50 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <header className="flex-shrink-0 z-50 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => router.push("/dashboard")}
                   className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
@@ -119,19 +166,19 @@ export default function ChatsPage() {
                   ← Back
                 </button>
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl">📷</span>
-                  <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">
+                  <span className="text-xl">📷</span>
+                  <h1 className="text-xl font-bold text-zinc-900 dark:text-white">
                     Instagram DMs
                   </h1>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <span className="text-sm text-zinc-600 dark:text-zinc-400">
                   {user?.username}
                 </span>
                 <button
                   onClick={handleLogout}
-                  className="px-4 py-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-medium transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white text-sm font-medium transition-colors"
                 >
                   Logout
                 </button>
@@ -141,27 +188,27 @@ export default function ChatsPage() {
         </header>
 
         {/* Main Content */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full">
           {/* Sidebar - Chat List */}
-          <aside className="w-80 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
+          <aside className="w-96 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col shadow-xl overflow-hidden">
             {/* Filters */}
-            <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
+            <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
               <div className="flex gap-2">
                 <button
-                  onClick={() => handleFilterChange("unread", undefined)}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    filters.unread === undefined
-                      ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                  onClick={() => handleFilterChange("is_read", undefined)}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    filters.is_read === undefined
+                      ? "bg-blue-600 text-white shadow-md"
                       : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                   }`}
                 >
                   All
                 </button>
                 <button
-                  onClick={() => handleFilterChange("unread", true)}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    filters.unread === true
-                      ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                  onClick={() => handleFilterChange("is_read", false)}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    filters.is_read === false
+                      ? "bg-blue-600 text-white shadow-md"
                       : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                   }`}
                 >
@@ -171,9 +218,9 @@ export default function ChatsPage() {
             </div>
 
             {/* Chat List */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto min-h-0">
               {loading && chats.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
+                <div className="flex items-center justify-center py-20">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
                     <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -182,7 +229,7 @@ export default function ChatsPage() {
                   </div>
                 </div>
               ) : error ? (
-                <div className="flex items-center justify-center h-full p-4">
+                <div className="flex items-center justify-center py-20 p-4">
                   <div className="text-center">
                     <p className="text-sm text-red-600 dark:text-red-400 mb-2">
                       {error}
@@ -196,7 +243,7 @@ export default function ChatsPage() {
                   </div>
                 </div>
               ) : chats.length === 0 ? (
-                <div className="flex items-center justify-center h-full p-4">
+                <div className="flex items-center justify-center py-20 p-4">
                   <p className="text-sm text-zinc-600 dark:text-zinc-400 text-center">
                     No chats found
                   </p>
@@ -207,43 +254,48 @@ export default function ChatsPage() {
                     <button
                       key={chat.id}
                       onClick={() => handleChatSelect(chat)}
-                      className={`w-full p-4 border-b border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors text-left ${
+                      className={`w-full p-4 border-b border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all text-left ${
                         selectedChat?.id === chat.id
-                          ? "bg-blue-50 dark:bg-blue-900/20"
+                          ? "bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-600"
                           : ""
                       }`}
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="text-2xl flex-shrink-0">
-                          {getPlatformEmoji(chat.account_type)}
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex-shrink-0">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xl font-bold shadow-lg">
+                            {chat.name?.charAt(0).toUpperCase() || "?"}
+                          </div>
+                          {!chat.is_read && (
+                            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-600 border-2 border-white dark:border-zinc-900"></span>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-1">
+                          <div className="flex items-center justify-between gap-2 mb-1">
                             <h3
-                              className={`font-medium truncate ${
-                                chat.unread_count > 0
+                              className={`font-semibold truncate ${
+                                !chat.is_read
                                   ? "text-zinc-900 dark:text-white"
                                   : "text-zinc-700 dark:text-zinc-300"
                               }`}
                             >
                               {chat.name || "Unnamed Chat"}
                             </h3>
-                            {chat.unread_count > 0 && (
-                              <span className="flex-shrink-0 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-600 text-white min-w-[20px]">
-                                {chat.unread_count}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-end">
-                            <span className="text-xs text-zinc-500 dark:text-zinc-500">
+                            <span className="text-xs text-zinc-500 dark:text-zinc-400 flex-shrink-0">
                               {formatTimestamp(chat.timestamp)}
                             </span>
                           </div>
+                          <p className={`text-sm truncate ${
+                            !chat.is_read 
+                              ? "text-zinc-600 dark:text-zinc-300 font-medium" 
+                              : "text-zinc-500 dark:text-zinc-400"
+                          }`}>
+                            {getLastMessagePreview(chat)}
+                          </p>
                         </div>
                       </div>
                     </button>
                   ))}
-                  {cursor && (
+                  {hasMore && (
                     <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
                       <button
                         onClick={() => loadChats(true)}
@@ -260,21 +312,21 @@ export default function ChatsPage() {
           </aside>
 
           {/* Main Chat Area */}
-          <main className="flex-1 bg-zinc-50 dark:bg-black flex flex-col">
+          <main className="flex-1 flex items-center justify-center bg-zinc-100 dark:bg-zinc-950 p-4 overflow-hidden">
             {selectedChat ? (
-              <>
+              <div className="w-full max-w-md h-full max-h-full flex flex-col bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
                 {/* Chat Header */}
-                <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-6 py-4">
+                <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-3 shadow-lg">
                   <div className="flex items-center gap-3">
-                    <div className="text-2xl">
-                      {getPlatformEmoji(selectedChat.account_type)}
+                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-lg flex items-center justify-center text-white text-lg font-bold">
+                      {selectedChat.name?.charAt(0).toUpperCase() || "?"}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h2 className="text-lg font-semibold text-zinc-900 dark:text-white truncate">
+                      <h2 className="text-base font-bold text-white truncate">
                         {selectedChat.name || "Unnamed Chat"}
                       </h2>
-                      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                        {selectedChat.account_type}
+                      <p className="text-xs text-white/80">
+                        Instagram
                       </p>
                     </div>
                   </div>
@@ -296,18 +348,22 @@ export default function ChatsPage() {
                     </div>
                   </div>
                 ) : (
-                  <MessageList messages={messages} loading={messagesLoading} />
+                  <div id="messages-container" className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-900">
+                    <MessageList messages={messages} loading={messagesLoading} />
+                  </div>
                 )}
-              </>
+              </div>
             ) : (
-              <div className="h-full flex items-center justify-center">
+              <div className="flex items-center justify-center h-full">
                 <div className="text-center max-w-md p-8">
-                  <div className="text-6xl mb-4">💬</div>
+                  <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-2xl">
+                    <span className="text-5xl">💬</span>
+                  </div>
                   <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
                     Select a chat
                   </h2>
                   <p className="text-zinc-600 dark:text-zinc-400">
-                    Choose a conversation from the sidebar to view messages
+                    Choose a conversation to start messaging
                   </p>
                 </div>
               </div>

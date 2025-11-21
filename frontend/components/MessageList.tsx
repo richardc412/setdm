@@ -113,8 +113,8 @@ export function MessageList({ messages, loading }: MessageListProps) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <div className="animate-spin rounded-full h-10 w-10 border-3 border-purple-600 border-t-transparent mx-auto mb-3"></div>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 font-medium">
             Loading messages...
           </p>
         </div>
@@ -125,10 +125,15 @@ export function MessageList({ messages, loading }: MessageListProps) {
   if (messages.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="text-4xl mb-2">💬</div>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <div className="text-center p-8">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
+            <span className="text-3xl">💬</span>
+          </div>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 font-medium">
             No messages yet
+          </p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">
+            Start the conversation!
           </p>
         </div>
       </div>
@@ -136,7 +141,7 @@ export function MessageList({ messages, loading }: MessageListProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 overflow-y-auto p-4 space-y-3">
       {messages.map((message) => {
         const isSender = message.is_sender === 1;
         
@@ -146,15 +151,15 @@ export function MessageList({ messages, loading }: MessageListProps) {
             className={`flex ${isSender ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[70%] ${
+              className={`max-w-[75%] ${
                 isSender
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white'
-              } rounded-2xl px-4 py-2 shadow-sm`}
+                  ? 'bg-gradient-to-br from-purple-600 to-pink-600 text-white'
+                  : 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700'
+              } rounded-2xl px-4 py-2.5 shadow-md`}
             >
               {/* Message text */}
               {message.text && (
-                <p className="text-sm whitespace-pre-wrap break-words">
+                <p className="text-[15px] leading-snug whitespace-pre-wrap break-words">
                   {message.text}
                 </p>
               )}
@@ -170,7 +175,7 @@ export function MessageList({ messages, loading }: MessageListProps) {
               
               {/* Reactions */}
               {message.reactions && message.reactions.length > 0 && (
-                <div className="flex gap-1 mt-1">
+                <div className="flex gap-1 mt-1.5">
                   {message.reactions.map((reaction, index) => (
                     <span
                       key={index}
@@ -184,9 +189,9 @@ export function MessageList({ messages, loading }: MessageListProps) {
               
               {/* Timestamp and status */}
               <div
-                className={`flex items-center gap-1 mt-1 text-xs ${
+                className={`flex items-center gap-1 mt-1.5 text-[11px] ${
                   isSender
-                    ? 'text-blue-100'
+                    ? 'text-white/70'
                     : 'text-zinc-500 dark:text-zinc-400'
                 }`}
               >

@@ -118,10 +118,9 @@ export async function logout(): Promise<void> {
 }
 
 /**
- * Unipile Chat API Types and Functions
+ * Chat API Types and Functions (from persistence layer)
  */
 export interface Chat {
-  object: string;
   id: string;
   account_id: string;
   account_type: string;
@@ -129,54 +128,45 @@ export interface Chat {
   name: string | null;
   timestamp: string | null;
   unread_count: number;
-  unread: boolean | null;
+  is_read: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ChatListResponse {
-  object: string;
   items: Chat[];
-  cursor: string | null;
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface ChatFilters {
-  unread?: boolean;
-  cursor?: string;
-  before?: string;
-  after?: string;
-  limit?: number;
-  account_type?: string;
+  is_read?: boolean;
   account_id?: string;
+  limit?: number;
+  offset?: number;
 }
 
 /**
- * Fetch all chats from Unipile API
+ * Fetch all chats from persistence layer
  */
 export async function getChats(filters?: ChatFilters): Promise<ChatListResponse> {
   const params = new URLSearchParams();
   
-  if (filters?.unread !== undefined) {
-    params.append('unread', String(filters.unread));
-  }
-  if (filters?.cursor) {
-    params.append('cursor', filters.cursor);
-  }
-  if (filters?.before) {
-    params.append('before', filters.before);
-  }
-  if (filters?.after) {
-    params.append('after', filters.after);
-  }
-  if (filters?.limit) {
-    params.append('limit', String(filters.limit));
-  }
-  if (filters?.account_type) {
-    params.append('account_type', filters.account_type);
+  if (filters?.is_read !== undefined) {
+    params.append('is_read', String(filters.is_read));
   }
   if (filters?.account_id) {
     params.append('account_id', filters.account_id);
   }
+  if (filters?.limit) {
+    params.append('limit', String(filters.limit));
+  }
+  if (filters?.offset) {
+    params.append('offset', String(filters.offset));
+  }
 
-  const url = `${API_BASE_URL}/api/unipile/chats${params.toString() ? '?' + params.toString() : ''}`;
+  const url = `${API_BASE_URL}/api/chats${params.toString() ? '?' + params.toString() : ''}`;
   
   const response = await fetch(url, {
     method: 'GET',
@@ -188,6 +178,25 @@ export async function getChats(filters?: ChatFilters): Promise<ChatListResponse>
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Failed to fetch chats' }));
     throw new ApiError(response.status, error.detail || 'Failed to fetch chats');
+  }
+
+  return response.json();
+}
+
+/**
+ * Mark a chat as read
+ */
+export async function markChatAsRead(chatId: string): Promise<Chat> {
+  const response = await fetch(`${API_BASE_URL}/api/chats/${chatId}/mark-read`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Failed to mark chat as read' }));
+    throw new ApiError(response.status, error.detail || 'Failed to mark chat as read');
   }
 
   return response.json();
@@ -239,21 +248,20 @@ export interface Message {
 }
 
 export interface MessageListResponse {
-  object: string;
   items: Message[];
-  cursor: any | null;
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface MessageFilters {
-  cursor?: string;
-  before?: string;
-  after?: string;
   limit?: number;
-  sender_id?: string;
+  offset?: number;
+  order_desc?: boolean;
 }
 
 /**
- * Fetch messages from a specific chat
+ * Fetch messages from a specific chat (from persistence layer)
  */
 export async function getChatMessages(
   chatId: string,
@@ -261,23 +269,17 @@ export async function getChatMessages(
 ): Promise<MessageListResponse> {
   const params = new URLSearchParams();
   
-  if (filters?.cursor) {
-    params.append('cursor', filters.cursor);
-  }
-  if (filters?.before) {
-    params.append('before', filters.before);
-  }
-  if (filters?.after) {
-    params.append('after', filters.after);
-  }
   if (filters?.limit) {
     params.append('limit', String(filters.limit));
   }
-  if (filters?.sender_id) {
-    params.append('sender_id', filters.sender_id);
+  if (filters?.offset) {
+    params.append('offset', String(filters.offset));
+  }
+  if (filters?.order_desc !== undefined) {
+    params.append('order_desc', String(filters.order_desc));
   }
 
-  const url = `${API_BASE_URL}/api/unipile/chats/${chatId}/messages${params.toString() ? '?' + params.toString() : ''}`;
+  const url = `${API_BASE_URL}/api/chats/${chatId}/messages${params.toString() ? '?' + params.toString() : ''}`;
   
   const response = await fetch(url, {
     method: 'GET',

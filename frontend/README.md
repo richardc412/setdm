@@ -1,5 +1,14 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Features
+
+- **Authentication**: Secure login/register with JWT tokens
+- **Instagram DMs**: View Instagram messages with real-time sync
+- **Read/Unread Tracking**: Automatic read status updates when opening chats
+- **Persistence Layer**: Messages stored in PostgreSQL for fast access
+- **Responsive Design**: Works on desktop and mobile devices
+- **Dark Mode**: Full dark mode support
+
 ## Getting Started
 
 First, run the development server:
@@ -28,6 +37,38 @@ To learn more about Next.js, take a look at the following resources:
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## API Integration
+
+The frontend connects to the backend API for:
+
+### Chat Management
+
+- `GET /api/chats` - Fetch chats from database (with `is_read` filter)
+- `GET /api/chats/{id}/messages` - Get messages for a specific chat
+- `POST /api/chats/{id}/mark-read` - Mark chat as read (auto-called on open)
+
+### Read/Unread Functionality
+
+- Chats show a **blue dot** indicator when unread (`is_read=false`)
+- Opening a chat automatically marks it as read
+- Filter by "All" or "Unread" to manage conversations
+- Read status persists across sessions
+
+### Key Files
+
+- `lib/api.ts` - API client with TypeScript types
+- `app/chats/page.tsx` - Main chat interface
+- `components/MessageList.tsx` - Message rendering
+- `components/ChatListItem.tsx` - Individual chat item
+
+## Environment Variables
+
+Create a `.env.local` file:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
 ## Deploy on Vercel
 

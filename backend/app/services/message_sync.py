@@ -11,7 +11,6 @@ from app.db.crud import (
     create_message,
     update_chat_timestamp,
     mark_chat_as_unread,
-    get_message_count_by_chat,
 )
 
 logger = logging.getLogger(__name__)
@@ -21,6 +20,9 @@ async def sync_all_chats(db: AsyncSession, account_id: Optional[str] = None) -> 
     """
     Sync all chats from Unipile API to local database.
     Fetches chats and creates/updates them in the database.
+    
+    Only marks chats for message sync if their timestamp has changed (indicating new messages).
+    New chats and chats with no messages are created but not synced on startup.
     
     This function handles pagination automatically and syncs all available chats.
     
@@ -68,19 +70,12 @@ async def sync_all_chats(db: AsyncSession, account_id: Optional[str] = None) -> 
                 needs_sync = False
                 
                 if not existing_chat:
-                    # New chat - always sync
-                    needs_sync = True
+                    # New chat - just create it, don't sync messages on startup
                     stats["chats_created"] += 1
                 else:
-                    # Existing chat - check if we need to sync
-                    # Sync if: timestamp changed OR chat has no messages yet
+                    # Existing chat - only sync if timestamp changed (new messages)
                     if chat_data.timestamp and chat_data.timestamp != existing_chat.timestamp:
                         needs_sync = True
-                    else:
-                        # Check if chat has any messages
-                        message_count = await get_message_count_by_chat(db, chat_data.id)
-                        if message_count == 0:
-                            needs_sync = True
                     stats["chats_updated"] += 1
                 
                 # Create or update chat

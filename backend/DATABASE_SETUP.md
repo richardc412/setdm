@@ -131,12 +131,11 @@ When the application starts (`main.py` lifespan event):
 1. **Initialize Database**: Creates tables if they don't exist
 2. **Sync All Chats**: Fetches chat list from Unipile, creates/updates in DB
 3. **Smart Message Sync**: Only syncs messages for chats that:
-   - Have a newer timestamp (new messages)
-   - Are new chats (first sync)
-   - Have no messages in DB yet
+   - Have a newer timestamp (new messages detected)
+   - ⚠️ Skips new chats and chats with 0 messages (sync manually if needed)
 4. **Mark Unread**: If new messages are from others (not the current user), marks chat as unread
 
-**Optimization**: Chats with unchanged timestamps are skipped, minimizing API calls!
+**Optimization**: Only syncs chats with confirmed new activity, minimizing API calls!
 
 ### Incremental Syncing
 

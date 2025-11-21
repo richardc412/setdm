@@ -64,9 +64,8 @@ Application Startup
            │       │   └─► INSERT or UPDATE in DB
            │       │
            │       └─► Check if needs message sync:
-           │           ├─► New chat? → Yes
-           │           ├─► Timestamp changed? → Yes
-           │           ├─► Has 0 messages? → Yes
+           │           ├─► New chat? → No (skip on startup)
+           │           ├─► Timestamp changed? → Yes (sync!)
            │           └─► Otherwise → No (skip)
            │
            └─► For chats that need sync only:

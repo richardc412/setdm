@@ -40,20 +40,20 @@ export function ChatListItem({ chat, isSelected, onClick }: ChatListItemProps) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-1">
-            <h3
-              className={`font-medium truncate ${
-                chat.unread_count > 0
-                  ? "text-zinc-900 dark:text-white"
-                  : "text-zinc-700 dark:text-zinc-300"
-              }`}
-            >
-              {chat.name || "Unnamed Chat"}
-            </h3>
-            {chat.unread_count > 0 && (
-              <span className="flex-shrink-0 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-600 text-white min-w-[20px]">
-                {chat.unread_count}
-              </span>
-            )}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <h3
+                className={`font-medium truncate ${
+                  !chat.is_read
+                    ? "text-zinc-900 dark:text-white font-semibold"
+                    : "text-zinc-700 dark:text-zinc-300"
+                }`}
+              >
+                {chat.name || "Unnamed Chat"}
+              </h3>
+              {!chat.is_read && (
+                <span className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-600"></span>
+              )}
+            </div>
           </div>
           <div className="flex items-center justify-end">
             <span className="text-xs text-zinc-500 dark:text-zinc-500">
