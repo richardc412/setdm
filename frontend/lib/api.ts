@@ -282,6 +282,7 @@ export interface Message {
   attendee_distance?: number;
   sender_urn?: string;
   reply_to?: any;
+  created_at?: string;
 }
 
 export interface MessageListResponse {

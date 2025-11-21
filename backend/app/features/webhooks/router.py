@@ -14,6 +14,7 @@ from app.db.crud import (
     mark_chat_as_unread,
     get_chat_by_id,
 )
+from app.services.realtime import broadcast_new_message
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,9 @@ async def process_webhook_message(db: AsyncSession, payload: WebhookMessagePaylo
         await mark_chat_as_unread(db, payload.chat_id)
         
         logger.info(f"Updated chat {payload.chat_id} with new message")
+        
+        # Broadcast to realtime subscribers
+        await broadcast_new_message(created_message)
     else:
         logger.info(f"Message {payload.message_id} already exists, skipping")
 

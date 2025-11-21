@@ -3,7 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getChats,
   Chat,
@@ -15,8 +15,20 @@ import {
   Attendee,
   sendMessage,
 } from "@/lib/api";
+import { realtimeClient, MessageEventPayload } from "@/lib/realtime";
 import { MessageList } from "@/components/MessageList";
 import { MessageInput } from "@/components/MessageInput";
+
+const sortChatsByPriority = (items: Chat[]) => {
+  return [...items].sort((a, b) => {
+    if (a.is_read !== b.is_read) {
+      return a.is_read ? 1 : -1;
+    }
+    const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return timeB - timeA;
+  });
+};
 
 export default function ChatsPage() {
   const { user, logout } = useAuth();
@@ -41,6 +53,27 @@ export default function ChatsPage() {
     Record<string, string>
   >({});
 
+  const selectedChatRef = useRef<Chat | null>(null);
+  const loadChatsRef = useRef<((loadMore?: boolean) => Promise<void>) | null>(
+    null
+  );
+
+  const scrollMessagesToBottom = () => {
+    if (typeof window === "undefined") return;
+
+    window.setTimeout(() => {
+      const messagesContainer = document.getElementById("messages-container");
+      if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    }, 100);
+  };
+
+  const normalizeRealtimeMessage = (payload: MessageEventPayload): Message =>
+    ({
+      ...payload,
+    } as Message);
+
   const loadChats = async (loadMore = false) => {
     try {
       setLoading(true);
@@ -50,28 +83,22 @@ export default function ChatsPage() {
       const filterParams = { ...filters, offset };
       const response = await getChats(filterParams);
 
-      // Sort chats: unread first, then by timestamp (newest first)
-      const sortedChats = response.items.sort((a, b) => {
-        // First, sort by read status (unread first)
-        if (a.is_read !== b.is_read) {
-          return a.is_read ? 1 : -1;
-        }
-        // Then sort by timestamp (newest first)
-        const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-        const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-        return timeB - timeA;
-      });
-
       if (loadMore) {
-        setChats((prev) => [...prev, ...sortedChats]);
+        setChats((prev) => sortChatsByPriority([...prev, ...response.items]));
       } else {
+        const sortedChats = sortChatsByPriority(response.items);
         setChats(sortedChats);
-        // Fetch profile pictures for new chats
         fetchProfilePictures(sortedChats);
       }
 
+      // Always fetch profile pictures for newly loaded chats
+      if (loadMore) {
+        fetchProfilePictures(response.items);
+      }
+
       // Check if there are more chats to load
-      setHasMore(response.items.length === filters.limit);
+      const limit = filters.limit ?? 50;
+      setHasMore(response.items.length === limit);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load chats");
       console.error("Error loading chats:", err);
@@ -79,6 +106,12 @@ export default function ChatsPage() {
       setLoading(false);
     }
   };
+
+  loadChatsRef.current = loadChats;
+
+  useEffect(() => {
+    selectedChatRef.current = selectedChat;
+  }, [selectedChat]);
 
   const fetchProfilePictures = async (chatsToFetch: Chat[]) => {
     // Fetch profile pictures for chats (in background, don't block UI)
@@ -113,13 +146,7 @@ export default function ChatsPage() {
 
       setMessages(response.items);
 
-      // Scroll to bottom after loading messages
-      setTimeout(() => {
-        const messagesContainer = document.getElementById("messages-container");
-        if (messagesContainer) {
-          messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-      }, 100);
+      scrollMessagesToBottom();
     } catch (err) {
       setMessagesError(
         err instanceof Error ? err.message : "Failed to load messages"
@@ -197,12 +224,7 @@ export default function ChatsPage() {
       setMessages((prev) => [...prev, optimisticMessage]);
 
       // Scroll to bottom to show the new message
-      setTimeout(() => {
-        const messagesContainer = document.getElementById("messages-container");
-        if (messagesContainer) {
-          messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-      }, 100);
+      scrollMessagesToBottom();
 
       // Reload messages in background to sync with server
       // Wait longer for backend sync to complete (it triggers immediately after send)
@@ -239,13 +261,7 @@ export default function ChatsPage() {
           }
 
           // Scroll to bottom after reloading
-          setTimeout(() => {
-            const messagesContainer =
-              document.getElementById("messages-container");
-            if (messagesContainer) {
-              messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            }
-          }, 100);
+          scrollMessagesToBottom();
 
           // Also refresh the chat list
           loadChats();
@@ -263,6 +279,65 @@ export default function ChatsPage() {
   useEffect(() => {
     loadChats();
   }, [filters.is_read]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    realtimeClient.connect();
+    const unsubscribe = realtimeClient.on<MessageEventPayload>(
+      "message:new",
+      (payload) => {
+        let chatFound = false;
+        setChats((prevChats) => {
+          const idx = prevChats.findIndex(
+            (chat) => chat.id === payload.chat_id
+          );
+          if (idx === -1) {
+            return prevChats;
+          }
+          chatFound = true;
+          const chat = prevChats[idx];
+          const isActive = selectedChatRef.current?.id === payload.chat_id;
+          const updatedChat: Chat = {
+            ...chat,
+            timestamp: payload.timestamp,
+            is_read: isActive ? true : false,
+            unread_count: isActive
+              ? 0
+              : (typeof chat.unread_count === "number"
+                  ? chat.unread_count
+                  : 0) + 1,
+          };
+          const next = [...prevChats];
+          next[idx] = updatedChat;
+          return sortChatsByPriority(next);
+        });
+
+        if (!chatFound) {
+          loadChatsRef.current?.();
+        }
+
+        if (selectedChatRef.current?.id === payload.chat_id) {
+          setSelectedChat((prev) =>
+            prev
+              ? { ...prev, timestamp: payload.timestamp, is_read: true }
+              : prev
+          );
+          setMessages((prev) => {
+            if (prev.some((msg) => msg.id === payload.id)) {
+              return prev;
+            }
+            return [...prev, normalizeRealtimeMessage(payload)];
+          });
+          scrollMessagesToBottom();
+        }
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const handleLogout = async () => {
     await logout();

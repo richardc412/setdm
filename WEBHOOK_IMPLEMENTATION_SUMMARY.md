@@ -2,7 +2,7 @@
 
 ## Overview
 
-Successfully implemented a complete webhook system for real-time message ingestion from Unipile. The system automatically registers webhooks on startup and processes incoming messages, saving them to the database for future SSE streaming to the frontend.
+Successfully implemented a complete webhook system for real-time message ingestion from Unipile. The system automatically registers webhooks on startup and processes incoming messages, saving them to the database and immediately broadcasting them to the frontend via a WebSocket channel (built with headroom for future bi-directional actions).
 
 ## Implementation Status: ✅ COMPLETE
 
@@ -70,6 +70,13 @@ Integrated webhook system into application startup:
 3. Include webhook router in FastAPI app
 4. Log webhook status for monitoring
 
+### 7. ✅ WebSocket Fan-out & Frontend Subscription
+
+- `backend/app/services/realtime.py` maintains an async connection manager and exposes `broadcast_new_message()` which is called as soon as a webhook message is persisted.
+- `backend/app/features/realtime/router.py` exposes `ws/messages` for now uni-directional streaming but keeps the receive-loop alive for future inbound actions.
+- `frontend/lib/realtime.ts` centralizes the browser WebSocket client with exponential backoff/retry and a typed `on(event, handler)` helper.
+- `frontend/app/chats/page.tsx` consumes `message:new` envelopes to reorder chats, adjust unread counts, and append live messages whenever the open chat matches the event’s `chat_id`.
+
 ## Files Created
 
 ```
@@ -77,8 +84,16 @@ backend/app/features/webhooks/
 ├── __init__.py          # Feature module initialization
 └── router.py            # Webhook endpoint and processing logic
 
+backend/app/features/realtime/
+├── __init__.py          # Realtime feature exports
+└── router.py            # WebSocket endpoint
+
 backend/app/services/
-└── webhook_manager.py   # Webhook lifecycle management
+├── webhook_manager.py   # Webhook lifecycle management
+└── realtime.py          # Connection manager + broadcast helpers
+
+frontend/lib/
+└── realtime.ts          # Browser WebSocket client
 
 backend/
 ├── WEBHOOK_SETUP.md     # Comprehensive setup guide
@@ -96,7 +111,14 @@ backend/app/core/
 └── config.py            # Added webhook_base_url setting
 
 backend/app/
-└── main.py              # Integrated webhook startup and router
+├── main.py              # Integrated webhook & realtime routers
+└── features/webhooks/router.py  # Emits websocket events after persistence
+
+frontend/app/
+└── chats/page.tsx       # Subscribes to realtime events and updates UI
+
+frontend/lib/
+└── api.ts               # Aligns message type with realtime payload
 ```
 
 ## Configuration Required
@@ -107,6 +129,13 @@ To enable webhooks, add to `.env`:
 WEBHOOK_BASE_URL=https://your-ngrok-url.ngrok.io  # Local dev
 # or
 WEBHOOK_BASE_URL=https://yourdomain.com           # Production
+```
+
+Frontend `.env.local` values:
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000      # or deployed API origin
+NEXT_PUBLIC_WS_PATH=/ws/messages               # optional override, defaults above
 ```
 
 ## How It Works
@@ -127,7 +156,8 @@ WEBHOOK_BASE_URL=https://yourdomain.com           # Production
 3. **Unipile POSTs** → To `{WEBHOOK_BASE_URL}/api/webhooks/unipile/messages`
 4. **Webhook endpoint** → Validates and processes payload
 5. **Database** → Message saved, chat updated
-6. **Future: SSE** → Message pushed to frontend (not yet implemented)
+6. **Realtime broadcaster** → `broadcast_new_message()` emits `message:new` over `/ws/messages`
+7. **Frontend** → `realtimeClient` updates chat ordering/unread counts and appends the message if the chat is open (existing REST fetches still work as fallback)
 
 ## Testing Checklist
 
@@ -143,14 +173,13 @@ WEBHOOK_BASE_URL=https://yourdomain.com           # Production
 
 ## Future Enhancements (Not Implemented Yet)
 
-### Server-Sent Events (SSE)
+### Bi-directional WebSocket Actions
 
-Planned for future implementation:
-1. **SSE Endpoint**: `GET /api/chats/stream`
-2. **Event Broadcaster**: In-memory broadcaster for connected clients
-3. **User Filtering**: Only send messages for authenticated user's accounts
-4. **Integration**: Hook webhook processing to broadcast events
-5. **Frontend**: Subscribe to SSE stream and display messages in real-time
+Planned next steps for the realtime layer:
+1. Authenticate and scope connections per user/account.
+2. Accept client-originated events (typing indicators, send message acknowledgements, etc.).
+3. Expand the event envelope to cover additional webhook types (read receipts, reactions, deletions).
+4. Add health metrics around connection counts and broadcast latency.
 
 ### Additional Webhook Events
 
@@ -167,7 +196,14 @@ Currently only handles `message_received`. Future support for:
 2. **Reduced API Calls**: No need to constantly poll for new messages
 3. **Scalability**: Webhook-based architecture scales better
 4. **Efficiency**: Only processes messages when they arrive
-5. **Future-Ready**: Infrastructure in place for SSE streaming
+5. **Future-Ready**: WebSocket channel already running and extensible for new event types/bi-directional flows
+
+## Fallback & Ops Notes
+
+- The WebSocket server reuses the FastAPI origin (`ws://localhost:8000/ws/messages` by default); no extra port is needed. Set `NEXT_PUBLIC_API_URL` accordingly.
+- The frontend will still function via REST fetches if the socket fails (messages load on chat open and the user can refresh manually). Socket errors are logged to the browser console and the client will retry with exponential backoff up to 30s.
+- For local testing run `uvicorn app.main:app --reload --port 8000` inside `backend/` and `npm run dev` inside `frontend/`. Provide the backend URL (and optional `NEXT_PUBLIC_WS_PATH`) via `.env.local`.
+- Production deployments should front the socket with the same reverse proxy as the API so TLS covers both HTTP and WS traffic.
 
 ## Monitoring
 

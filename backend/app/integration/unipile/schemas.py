@@ -1,5 +1,5 @@
 from typing import Optional, Any, Union
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field, AliasChoices
 
 
 # Chat Attendee Types
@@ -315,17 +315,30 @@ class WebhookListResponse(BaseModel):
 
 class WebhookSenderInfo(BaseModel):
     """Sender information in webhook payload."""
-    id: str
-    provider_id: str
-    name: str
+    id: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("id", "attendee_id")
+    )
+    provider_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("provider_id", "attendee_provider_id"),
+    )
+    name: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("name", "attendee_name")
+    )
     picture_url: Optional[str] = None
 
 
 class WebhookAccountInfo(BaseModel):
     """Account information in webhook payload."""
-    id: str
-    provider_id: str
-    username: Optional[str] = None
+    id: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("id", "user_id")
+    )
+    provider_id: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("provider_id", "user_id")
+    )
+    username: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("username", "user_name")
+    )
 
 
 class WebhookMessagePayload(BaseModel):
@@ -352,5 +365,5 @@ class WebhookMessagePayload(BaseModel):
     chat_content_type: Optional[str] = None
     message_type: Optional[str] = None
     is_group: Optional[int] = None
-    folder: Optional[str] = None
+    folder: Optional[Union[str, list[str]]] = None
 
