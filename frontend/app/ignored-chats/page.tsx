@@ -38,7 +38,9 @@ export default function IgnoredChatsPage() {
       setChats(response.items);
       fetchProfilePictures(response.items);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load ignored chats");
+      setError(
+        err instanceof Error ? err.message : "Failed to load ignored chats"
+      );
       console.error("Error loading ignored chats:", err);
     } finally {
       setLoading(false);
@@ -66,9 +68,12 @@ export default function IgnoredChatsPage() {
     }
   };
 
-  const handleUnignoreChat = async (chatId: string, event: React.MouseEvent) => {
+  const handleUnignoreChat = async (
+    chatId: string,
+    event: React.MouseEvent
+  ) => {
     event.stopPropagation();
-    
+
     try {
       await unignoreChat(chatId);
       // Remove the chat from the list
@@ -191,13 +196,16 @@ export default function IgnoredChatsPage() {
                                       e.currentTarget.style.display = "none";
                                       const fallback = e.currentTarget
                                         .nextElementSibling as HTMLElement;
-                                      if (fallback) fallback.style.display = "flex";
+                                      if (fallback)
+                                        fallback.style.display = "flex";
                                     }}
                                   />
                                 ) : null}
                                 <div
                                   className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-white text-xl font-bold shadow-lg opacity-60"
-                                  style={{ display: profilePic ? "none" : "flex" }}
+                                  style={{
+                                    display: profilePic ? "none" : "flex",
+                                  }}
                                 >
                                   {chat.name?.charAt(0).toUpperCase() || "?"}
                                 </div>
@@ -229,7 +237,9 @@ export default function IgnoredChatsPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
-                                  onClick={(e) => handleUnignoreChat(chat.id, e as any)}
+                                  onClick={(e) =>
+                                    handleUnignoreChat(chat.id, e as any)
+                                  }
                                   className="cursor-pointer"
                                 >
                                   Unignore Chat
@@ -255,4 +265,3 @@ export default function IgnoredChatsPage() {
     </ProtectedRoute>
   );
 }
-

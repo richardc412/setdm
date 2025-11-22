@@ -1,17 +1,41 @@
 "use client";
 
 import { useState, useRef, KeyboardEvent } from "react";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupTextarea,
+} from "@/components/ui/input-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown, Loader2, Paperclip, Send } from "lucide-react";
 
 interface MessageInputProps {
   onSendMessage: (text: string, attachments: File[]) => Promise<void>;
   disabled?: boolean;
 }
 
+type AssistMode = "manual" | "ai-assisted" | "autopilot";
+
+const MODE_LABELS: Record<AssistMode, string> = {
+  manual: "Manual",
+  "ai-assisted": "AI Assisted",
+  autopilot: "Autopilot",
+};
+
 export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [assistMode, setAssistMode] = useState<AssistMode>("manual");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSend = async () => {
@@ -81,27 +105,6 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
 
       {/* Input Area */}
       <div className="flex items-end gap-2">
-        {/* File Attachment Button */}
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || sending}
-          className="flex-shrink-0 p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Attach file"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-          </svg>
-        </button>
         <input
           ref={fileInputRef}
           type="file"
@@ -110,71 +113,101 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
           className="hidden"
         />
 
-        {/* Text Input */}
-        <div className="flex-1 relative">
-          <textarea
+        <InputGroup
+          data-disabled={disabled || sending}
+          className="flex-1 items-end bg-zinc-100 dark:bg-zinc-900/60"
+        >
+          <InputGroupAddon className="gap-1 pl-2 pr-1 items-end">
+            <InputGroupButton
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled || sending}
+              aria-label="Attach files"
+            >
+              <Paperclip className="size-4" />
+            </InputGroupButton>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <InputGroupButton
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-1 text-xs font-medium"
+                  disabled={disabled || sending}
+                >
+                  {MODE_LABELS[assistMode]}
+                  <ChevronDown className="size-3.5 opacity-70" />
+                </InputGroupButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuLabel>Response mode</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={assistMode}
+                  onValueChange={(value) => setAssistMode(value as AssistMode)}
+                >
+                  <DropdownMenuRadioItem value="manual">
+                    <div className="flex flex-col text-left">
+                      <span className="text-sm font-medium">Manual</span>
+                      <span className="text-xs text-muted-foreground">
+                        You craft every message yourself.
+                      </span>
+                    </div>
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="ai-assisted">
+                    <div className="flex flex-col text-left">
+                      <span className="text-sm font-medium">AI Assisted</span>
+                      <span className="text-xs text-muted-foreground">
+                        Get suggestions before sending.
+                      </span>
+                    </div>
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="autopilot">
+                    <div className="flex flex-col text-left">
+                      <span className="text-sm font-medium">Autopilot</span>
+                      <span className="text-xs text-muted-foreground">
+                        Let AI drive the conversation.
+                      </span>
+                    </div>
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </InputGroupAddon>
+
+          <InputGroupTextarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyPress}
             placeholder="Type a message..."
             disabled={disabled || sending}
             rows={1}
-            className="w-full px-4 py-2.5 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              minHeight: "44px",
-              maxHeight: "120px",
-            }}
+            className="min-h-[44px] max-h-[140px] overflow-y-auto scrollbar-hide"
           />
-        </div>
 
-        {/* Send Button */}
-        <button
-          type="button"
-          onClick={handleSend}
-          disabled={
-            (!message.trim() && attachments.length === 0) ||
-            disabled ||
-            sending
-          }
-          className="flex-shrink-0 p-2.5 rounded-lg bg-slate-700 hover:bg-slate-800 text-white transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-        >
-          {sending ? (
-            <svg
-              className="animate-spin h-5 w-5"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
+          <InputGroupAddon align="inline-end" className="pr-3 items-end">
+            <InputGroupButton
+              type="button"
+              size="icon-sm"
+              className="bg-slate-700 text-white hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500"
+              onClick={handleSend}
+              disabled={
+                (!message.trim() && attachments.length === 0) ||
+                disabled ||
+                sending
+              }
+              aria-label="Send message"
             >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
-          )}
-        </button>
+              {sending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Send className="size-4" />
+              )}
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
       </div>
 
       {/* Error Message */}
@@ -193,4 +226,3 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
     </div>
   );
 }
-
