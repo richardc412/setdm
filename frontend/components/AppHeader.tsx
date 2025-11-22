@@ -60,18 +60,28 @@ export default function AppHeader({
           {/* Navigation Links */}
           <nav className="flex items-center gap-2">
             <Button
-              variant={isActive("/dashboard") ? "slate" : "ghost"}
+              variant={isActive("/dashboard") ? "default" : "ghost"}
               size="sm"
               asChild
+              className={isActive("/dashboard") ? "bg-slate-700 text-white hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500" : ""}
             >
               <Link href="/dashboard">Dashboard</Link>
             </Button>
             <Button
-              variant={isActive("/chats") ? "slate" : "ghost"}
+              variant={isActive("/chats") ? "default" : "ghost"}
               size="sm"
               asChild
+              className={isActive("/chats") ? "bg-slate-700 text-white hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500" : ""}
             >
               <Link href="/chats">Messages</Link>
+            </Button>
+            <Button
+              variant={isActive("/ai-config") ? "default" : "ghost"}
+              size="sm"
+              asChild
+              className={isActive("/ai-config") ? "bg-slate-700 text-white hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500" : ""}
+            >
+              <Link href="/ai-config">AI Config</Link>
             </Button>
           </nav>
         </div>

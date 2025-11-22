@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Loader2, Paperclip, Send } from "lucide-react";
 import { ApiError, generateSuggestedMessage } from "@/lib/api";
+import { useAiConfig } from "@/contexts/AiConfigContext";
 
 interface MessageInputProps {
   onSendMessage: (text: string, attachments: File[]) => Promise<void>;
@@ -44,6 +45,7 @@ export function MessageInput({
   const [error, setError] = useState<string | null>(null);
   const [assistMode, setAssistMode] = useState<AssistMode>("manual");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { prompt: aiPrompt, isLoaded: aiConfigLoaded } = useAiConfig();
 
   const handleSend = async () => {
     if (
@@ -82,9 +84,13 @@ export function MessageInput({
       setError("Select a chat to request a suggestion.");
       return;
     }
-    const prompt = message.trim();
+    if (!aiConfigLoaded) {
+      setError("AI prompt is still loading. Please try again.");
+      return;
+    }
+    const prompt = aiPrompt.trim();
     if (!prompt) {
-      setError("Add a short prompt before requesting a suggestion.");
+      setError("Set an AI prompt before requesting suggestions.");
       return;
     }
 
