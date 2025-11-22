@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
+    # AI Settings
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+    openai_history_limit: int = 20
+
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
         env_file_encoding="utf-8",

@@ -26,7 +26,11 @@ from app.features.chats.schemas import (
     MessageResponse,
     MessageListResponse,
     SyncResponse,
+    GenerateResponseRequest,
+    GenerateResponsePayload,
 )
+from app.services.ai_assistant import generate_sales_response, AISuggestionError
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chats", tags=["chats"])
@@ -201,6 +205,56 @@ async def list_chat_messages(
     except Exception as e:
         logger.error(f"Error fetching messages for chat {chat_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch messages: {str(e)}")
+
+
+@router.post("/{chat_id}/generate-response", response_model=GenerateResponsePayload)
+async def generate_ai_response(
+    chat_id: str,
+    request: GenerateResponseRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate an AI-assisted response for the specified chat.
+
+    Requires an OPENAI_API_KEY to be configured on the backend.
+    """
+    try:
+        chat = await get_chat_by_id(db, chat_id)
+        if not chat:
+            raise HTTPException(status_code=404, detail=f"Chat {chat_id} not found")
+
+        settings = get_settings()
+        history_limit = request.history_limit or settings.openai_history_limit
+
+        messages = await get_messages_by_chat(
+            db,
+            chat_id=chat_id,
+            limit=history_limit,
+            order_desc=True,
+        )
+
+        # Reverse to chronological order (oldest first)
+        chronological_messages = list(reversed(messages))
+
+        suggestion = await generate_sales_response(
+            chat,
+            chronological_messages,
+            request.prompt,
+            history_limit=history_limit,
+        )
+
+        return GenerateResponsePayload(
+            suggestion=suggestion,
+            prompt=request.prompt,
+        )
+    except HTTPException:
+        raise
+    except AISuggestionError as exc:
+        logger.error("Failed to generate AI suggestion for chat %s: %s", chat_id, str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as e:
+        logger.exception("Unexpected error generating AI response for chat %s", chat_id)
+        raise HTTPException(status_code=500, detail=f"Failed to generate AI response: {str(e)}")
 
 
 @router.post("/{chat_id}/mark-read", response_model=ChatResponse)

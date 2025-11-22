@@ -348,6 +348,16 @@ export interface MessageFilters {
   order_desc?: boolean;
 }
 
+export interface GenerateSuggestionRequest {
+  prompt: string;
+  history_limit?: number;
+}
+
+export interface GenerateSuggestionResponse {
+  suggestion: string;
+  prompt: string;
+}
+
 /**
  * Fetch messages from a specific chat (from persistence layer)
  */
@@ -379,6 +389,37 @@ export async function getChatMessages(
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Failed to fetch messages' }));
     throw new ApiError(response.status, error.detail || 'Failed to fetch messages');
+  }
+
+  return response.json();
+}
+
+/**
+ * Request an AI-generated message suggestion for a chat
+ */
+export async function generateSuggestedMessage(
+  chatId: string,
+  request: GenerateSuggestionRequest
+): Promise<GenerateSuggestionResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/chats/${chatId}/generate-response`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({
+      detail: "Failed to generate suggestion",
+    }));
+    throw new ApiError(
+      response.status,
+      error.detail || "Failed to generate suggestion"
+    );
   }
 
   return response.json();

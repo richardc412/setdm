@@ -16,10 +16,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Loader2, Paperclip, Send } from "lucide-react";
+import { ApiError, generateSuggestedMessage } from "@/lib/api";
 
 interface MessageInputProps {
   onSendMessage: (text: string, attachments: File[]) => Promise<void>;
   disabled?: boolean;
+  chatId?: string;
 }
 
 type AssistMode = "manual" | "ai-assisted" | "autopilot";
@@ -30,16 +32,26 @@ const MODE_LABELS: Record<AssistMode, string> = {
   autopilot: "Autopilot",
 };
 
-export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
+export function MessageInput({
+  onSendMessage,
+  disabled,
+  chatId,
+}: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [assistMode, setAssistMode] = useState<AssistMode>("manual");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSend = async () => {
-    if ((!message.trim() && attachments.length === 0) || sending || disabled) {
+    if (
+      (!message.trim() && attachments.length === 0) ||
+      sending ||
+      suggesting ||
+      disabled
+    ) {
       return;
     }
 
@@ -56,6 +68,40 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
       );
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleGenerateSuggestion = async () => {
+    if (assistMode !== "ai-assisted") {
+      return;
+    }
+    if (suggesting || sending || disabled) {
+      return;
+    }
+    if (!chatId) {
+      setError("Select a chat to request a suggestion.");
+      return;
+    }
+    const prompt = message.trim();
+    if (!prompt) {
+      setError("Add a short prompt before requesting a suggestion.");
+      return;
+    }
+
+    setSuggesting(true);
+    setError(null);
+
+    try {
+      const response = await generateSuggestedMessage(chatId, { prompt });
+      setMessage(response.suggestion);
+    } catch (err) {
+      const friendlyMessage =
+        err instanceof ApiError
+          ? err.message
+          : "Failed to generate suggestion. Please try again.";
+      setError(friendlyMessage);
+    } finally {
+      setSuggesting(false);
     }
   };
 
@@ -114,7 +160,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
         />
 
         <InputGroup
-          data-disabled={disabled || sending}
+          data-disabled={disabled || sending || suggesting}
           className="flex-1 items-end bg-zinc-100 dark:bg-zinc-900/60"
         >
           <InputGroupAddon className="gap-1 pl-2 pr-1 items-end">
@@ -123,7 +169,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
               size="icon-sm"
               variant="ghost"
               onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || sending}
+              disabled={disabled || sending || suggesting}
               aria-label="Attach files"
             >
               <Paperclip className="size-4" />
@@ -136,7 +182,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
                   size="sm"
                   variant="outline"
                   className="gap-1 text-xs font-medium"
-                  disabled={disabled || sending}
+                  disabled={disabled || sending || suggesting}
                 >
                   {MODE_LABELS[assistMode]}
                   <ChevronDown className="size-3.5 opacity-70" />
@@ -175,6 +221,24 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {assistMode === "ai-assisted" && (
+              <InputGroupButton
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="text-xs font-semibold whitespace-nowrap"
+                onClick={handleGenerateSuggestion}
+                disabled={disabled || sending || suggesting}
+                aria-label="Generate AI suggestion"
+              >
+                {suggesting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  "Suggest"
+                )}
+              </InputGroupButton>
+            )}
           </InputGroupAddon>
 
           <InputGroupTextarea
@@ -182,7 +246,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyPress}
             placeholder="Type a message..."
-            disabled={disabled || sending}
+            disabled={disabled || sending || suggesting}
             rows={1}
             className="min-h-[44px] max-h-[140px] overflow-y-auto scrollbar-hide"
           />
@@ -196,7 +260,8 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
               disabled={
                 (!message.trim() && attachments.length === 0) ||
                 disabled ||
-                sending
+                sending ||
+                suggesting
               }
               aria-label="Send message"
             >

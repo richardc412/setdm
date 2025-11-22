@@ -1,7 +1,7 @@
 """Pydantic schemas for chats API."""
 from typing import Optional, Any
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ChatResponse(BaseModel):
@@ -73,4 +73,22 @@ class SyncResponse(BaseModel):
     success: bool
     message: str
     stats: dict[str, Any]
+
+
+class GenerateResponseRequest(BaseModel):
+    """Request payload for AI-generated suggestions."""
+    prompt: str = Field(..., min_length=1, description="Instruction or goal for the AI assistant")
+    history_limit: int | None = Field(
+        default=None,
+        ge=1,
+        le=100,
+        description="Override for number of historical messages to include",
+    )
+
+
+class GenerateResponsePayload(BaseModel):
+    """Response payload for AI-generated suggestions."""
+    suggestion: str
+    prompt: str
+
 

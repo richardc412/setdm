@@ -685,6 +685,7 @@ export default function ChatsPage() {
                     <MessageInput
                       onSendMessage={handleSendMessage}
                       disabled={messagesLoading || selectedChat.is_ignored}
+                      chatId={selectedChat.id}
                     />
                   </>
                 )}
