@@ -587,7 +587,7 @@ export default function ChatsPage() {
           {/* Main Chat Area */}
           <main className="flex-1 flex items-center justify-center bg-zinc-100 dark:bg-zinc-950 p-4 overflow-hidden">
             {selectedChat ? (
-              <div className="w-full max-w-md h-full max-h-full flex flex-col bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
+              <div className="w-full max-w-2xl h-full max-h-full flex flex-col bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
                 {/* Chat Header */}
                 <div className="bg-slate-700 px-4 py-3 shadow-lg">
                   <div className="flex items-center gap-3">
