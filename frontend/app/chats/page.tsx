@@ -585,9 +585,9 @@ export default function ChatsPage() {
           </aside>
 
           {/* Main Chat Area */}
-          <main className="flex-1 flex items-center justify-center bg-zinc-100 dark:bg-zinc-950 p-4 overflow-hidden">
+          <main className="flex-1 flex items-stretch bg-zinc-100 dark:bg-zinc-950 overflow-hidden">
             {selectedChat ? (
-              <div className="w-full max-w-2xl h-full max-h-full flex flex-col bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
+              <div className="w-full max-w-2xl h-full flex flex-col bg-white dark:bg-zinc-900 shadow-2xl overflow-hidden border-r border-zinc-200 dark:border-zinc-800">
                 {/* Chat Header */}
                 <div className="bg-slate-700 px-4 py-3 shadow-lg">
                   <div className="flex items-center gap-3">
@@ -659,7 +659,7 @@ export default function ChatsPage() {
                 )}
               </div>
             ) : (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex items-center justify-center w-full max-w-2xl h-full border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
                 <div className="text-center max-w-md p-8">
                   <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-slate-700 flex items-center justify-center shadow-2xl">
                     <span className="text-5xl">💬</span>
@@ -673,6 +673,11 @@ export default function ChatsPage() {
                 </div>
               </div>
             )}
+            
+            {/* Right panel - space for future features */}
+            <div className="flex-1 bg-zinc-50 dark:bg-zinc-950">
+              {/* Reserved for future features */}
+            </div>
           </main>
         </div>
       </div>
