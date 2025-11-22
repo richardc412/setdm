@@ -11,6 +11,8 @@ from app.db.crud import (
     get_chat_by_id,
     get_messages_by_chat,
     mark_chat_as_read,
+    ignore_chat,
+    unignore_chat,
     get_message_count_by_chat,
     get_attendee_by_provider_id,
     upsert_attendee,
@@ -33,6 +35,7 @@ router = APIRouter(prefix="/api/chats", tags=["chats"])
 @router.get("", response_model=ChatListResponse)
 async def list_chats(
     is_read: Optional[bool] = Query(None, description="Filter by read/unread status"),
+    is_ignored: Optional[bool] = Query(None, description="Filter by ignored status (default: exclude ignored)"),
     account_id: Optional[str] = Query(None, description="Filter by account ID"),
     limit: int = Query(100, ge=1, le=250, description="Maximum number of results"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
@@ -43,6 +46,7 @@ async def list_chats(
     
     Query parameters:
     - is_read: Filter by read (true) or unread (false) status. Omit for all chats.
+    - is_ignored: Filter by ignored status. By default, ignored chats are excluded. Set to true to get only ignored chats.
     - account_id: Filter by specific account ID
     - limit: Maximum number of results (1-250)
     - offset: Number of results to skip (for pagination)
@@ -55,6 +59,7 @@ async def list_chats(
             db,
             account_id=account_id,
             is_read=is_read,
+            is_ignored=is_ignored,
             limit=limit,
             offset=offset,
         )
@@ -224,6 +229,62 @@ async def mark_chat_read(
     except Exception as e:
         logger.error(f"Error marking chat {chat_id} as read: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to mark chat as read: {str(e)}")
+
+
+@router.post("/{chat_id}/ignore", response_model=ChatResponse)
+async def ignore_chat_endpoint(
+    chat_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Ignore a chat.
+    
+    Path parameters:
+    - chat_id: Chat ID
+    
+    Returns:
+    - Updated chat details
+    """
+    try:
+        chat = await ignore_chat(db, chat_id)
+        
+        if not chat:
+            raise HTTPException(status_code=404, detail=f"Chat {chat_id} not found")
+        
+        return ChatResponse.model_validate(chat)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error ignoring chat {chat_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to ignore chat: {str(e)}")
+
+
+@router.post("/{chat_id}/unignore", response_model=ChatResponse)
+async def unignore_chat_endpoint(
+    chat_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Unignore a chat.
+    
+    Path parameters:
+    - chat_id: Chat ID
+    
+    Returns:
+    - Updated chat details
+    """
+    try:
+        chat = await unignore_chat(db, chat_id)
+        
+        if not chat:
+            raise HTTPException(status_code=404, detail=f"Chat {chat_id} not found")
+        
+        return ChatResponse.model_validate(chat)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error unignoring chat {chat_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to unignore chat: {str(e)}")
 
 
 @router.post("/{chat_id}/sync", response_model=SyncResponse)

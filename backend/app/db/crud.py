@@ -93,6 +93,7 @@ async def get_all_chats(
     db: AsyncSession,
     account_id: Optional[str] = None,
     is_read: Optional[bool] = None,
+    is_ignored: Optional[bool] = None,
     limit: int = 100,
     offset: int = 0,
 ) -> Sequence[ChatModel]:
@@ -103,6 +104,7 @@ async def get_all_chats(
         db: Database session
         account_id: Filter by account ID
         is_read: Filter by read/unread status
+        is_ignored: Filter by ignored status (default: False to exclude ignored chats)
         limit: Maximum number of results
         offset: Number of results to skip
         
@@ -117,6 +119,11 @@ async def get_all_chats(
         filters.append(ChatModel.account_id == account_id)
     if is_read is not None:
         filters.append(ChatModel.is_read == is_read)
+    # By default, exclude ignored chats unless explicitly requested
+    if is_ignored is None:
+        filters.append(ChatModel.is_ignored == False)
+    elif is_ignored is not None:
+        filters.append(ChatModel.is_ignored == is_ignored)
     
     if filters:
         query = query.where(and_(*filters))
@@ -192,6 +199,52 @@ async def mark_chat_as_unread(
     chat = await get_chat_by_id(db, chat_id)
     if chat:
         chat.is_read = False
+        chat.updated_at = datetime.utcnow()
+        await db.commit()
+        await db.refresh(chat)
+    return chat
+
+
+async def ignore_chat(
+    db: AsyncSession,
+    chat_id: str,
+) -> Optional[ChatModel]:
+    """
+    Mark chat as ignored.
+    
+    Args:
+        db: Database session
+        chat_id: Chat ID
+        
+    Returns:
+        Updated ChatModel instance or None if not found
+    """
+    chat = await get_chat_by_id(db, chat_id)
+    if chat:
+        chat.is_ignored = True
+        chat.updated_at = datetime.utcnow()
+        await db.commit()
+        await db.refresh(chat)
+    return chat
+
+
+async def unignore_chat(
+    db: AsyncSession,
+    chat_id: str,
+) -> Optional[ChatModel]:
+    """
+    Mark chat as not ignored.
+    
+    Args:
+        db: Database session
+        chat_id: Chat ID
+        
+    Returns:
+        Updated ChatModel instance or None if not found
+    """
+    chat = await get_chat_by_id(db, chat_id)
+    if chat:
+        chat.is_ignored = False
         chat.updated_at = datetime.utcnow()
         await db.commit()
         await db.refresh(chat)

@@ -129,6 +129,7 @@ export interface Chat {
   timestamp: string | null;
   unread_count: number;
   is_read: boolean;
+  is_ignored: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -142,6 +143,7 @@ export interface ChatListResponse {
 
 export interface ChatFilters {
   is_read?: boolean;
+  is_ignored?: boolean;
   account_id?: string;
   limit?: number;
   offset?: number;
@@ -155,6 +157,9 @@ export async function getChats(filters?: ChatFilters): Promise<ChatListResponse>
   
   if (filters?.is_read !== undefined) {
     params.append('is_read', String(filters.is_read));
+  }
+  if (filters?.is_ignored !== undefined) {
+    params.append('is_ignored', String(filters.is_ignored));
   }
   if (filters?.account_id) {
     params.append('account_id', filters.account_id);
@@ -200,6 +205,51 @@ export async function markChatAsRead(chatId: string): Promise<Chat> {
   }
 
   return response.json();
+}
+
+/**
+ * Ignore a chat
+ */
+export async function ignoreChat(chatId: string): Promise<Chat> {
+  const response = await fetch(`${API_BASE_URL}/api/chats/${chatId}/ignore`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Failed to ignore chat' }));
+    throw new ApiError(response.status, error.detail || 'Failed to ignore chat');
+  }
+
+  return response.json();
+}
+
+/**
+ * Unignore a chat
+ */
+export async function unignoreChat(chatId: string): Promise<Chat> {
+  const response = await fetch(`${API_BASE_URL}/api/chats/${chatId}/unignore`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Failed to unignore chat' }));
+    throw new ApiError(response.status, error.detail || 'Failed to unignore chat');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get ignored chats
+ */
+export async function getIgnoredChats(filters?: Omit<ChatFilters, 'is_ignored'>): Promise<ChatListResponse> {
+  return getChats({ ...filters, is_ignored: true });
 }
 
 /**

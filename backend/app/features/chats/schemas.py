@@ -14,6 +14,7 @@ class ChatResponse(BaseModel):
     timestamp: Optional[str] = None
     unread_count: int
     is_read: bool
+    is_ignored: bool
     created_at: datetime
     updated_at: datetime
 

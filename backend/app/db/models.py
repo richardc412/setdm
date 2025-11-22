@@ -28,6 +28,7 @@ class ChatModel(Base):
     
     # Local fields for our app
     is_read: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    is_ignored: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

@@ -14,10 +14,18 @@ import {
   getChatAttendee,
   Attendee,
   sendMessage,
+  ignoreChat,
 } from "@/lib/api";
 import { realtimeClient, MessageEventPayload } from "@/lib/realtime";
 import { MessageList } from "@/components/MessageList";
 import { MessageInput } from "@/components/MessageInput";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical } from "lucide-react";
 
 const sortChatsByPriority = (items: Chat[]) => {
   return [...items].sort((a, b) => {
@@ -172,6 +180,24 @@ export default function ChatsPage() {
         console.error("Failed to mark chat as read:", err);
         // Don't show error to user, this is a background operation
       }
+    }
+  };
+
+  const handleIgnoreChat = async (chatId: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent chat selection
+    
+    try {
+      await ignoreChat(chatId);
+      // Remove the chat from the list
+      setChats((prevChats) => prevChats.filter((c) => c.id !== chatId));
+      // If the ignored chat was selected, clear selection
+      if (selectedChat?.id === chatId) {
+        setSelectedChat(null);
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error("Failed to ignore chat:", err);
+      alert("Failed to ignore chat. Please try again.");
     }
   };
 
@@ -381,7 +407,7 @@ export default function ChatsPage() {
           <aside className="w-96 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col shadow-xl overflow-hidden">
             {/* Filters */}
             <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-2">
                 <button
                   onClick={() => handleFilterChange("is_read", undefined)}
                   className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
@@ -403,6 +429,12 @@ export default function ChatsPage() {
                   Unread
                 </button>
               </div>
+              <button
+                onClick={() => router.push("/ignored-chats")}
+                className="w-full px-3 py-2 rounded-lg text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+              >
+                View Ignored Chats
+              </button>
             </div>
 
             {/* Chat List */}
@@ -442,68 +474,98 @@ export default function ChatsPage() {
                     const profilePic = profilePictures[chat.provider_id];
 
                     return (
-                      <button
+                      <div
                         key={chat.id}
-                        onClick={() => handleChatSelect(chat)}
-                        className={`w-full p-4 border-b border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all text-left ${
+                        className={`w-full border-b border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all ${
                           selectedChat?.id === chat.id
                             ? "bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-600"
                             : ""
                         }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="relative flex-shrink-0">
-                            {profilePic ? (
-                              <img
-                                src={profilePic}
-                                alt={chat.name || "Profile"}
-                                className="w-12 h-12 rounded-full object-cover shadow-lg"
-                                onError={(e) => {
-                                  // Fallback to gradient avatar if image fails to load
-                                  e.currentTarget.style.display = "none";
-                                  const fallback = e.currentTarget
-                                    .nextElementSibling as HTMLElement;
-                                  if (fallback) fallback.style.display = "flex";
-                                }}
-                              />
-                            ) : null}
-                            <div
-                              className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-white text-xl font-bold shadow-lg"
-                              style={{ display: profilePic ? "none" : "flex" }}
-                            >
-                              {chat.name?.charAt(0).toUpperCase() || "?"}
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => handleChatSelect(chat)}
+                            className="flex-1 min-w-0 p-4 text-left"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="relative flex-shrink-0">
+                                {profilePic ? (
+                                  <img
+                                    src={profilePic}
+                                    alt={chat.name || "Profile"}
+                                    className="w-12 h-12 rounded-full object-cover shadow-lg"
+                                    onError={(e) => {
+                                      // Fallback to gradient avatar if image fails to load
+                                      e.currentTarget.style.display = "none";
+                                      const fallback = e.currentTarget
+                                        .nextElementSibling as HTMLElement;
+                                      if (fallback) fallback.style.display = "flex";
+                                    }}
+                                  />
+                                ) : null}
+                                <div
+                                  className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-white text-xl font-bold shadow-lg"
+                                  style={{ display: profilePic ? "none" : "flex" }}
+                                >
+                                  {chat.name?.charAt(0).toUpperCase() || "?"}
+                                </div>
+                                {!chat.is_read && (
+                                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-600 border-2 border-white dark:border-zinc-900"></span>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2 mb-1 min-w-0">
+                                  <h3
+                                    className={`font-semibold truncate flex-1 min-w-0 ${
+                                      !chat.is_read
+                                        ? "text-zinc-900 dark:text-white"
+                                        : "text-zinc-700 dark:text-zinc-300"
+                                    }`}
+                                  >
+                                    {chat.name || "Unnamed Chat"}
+                                  </h3>
+                                  <span className="text-xs text-zinc-500 dark:text-zinc-400 flex-shrink-0 whitespace-nowrap">
+                                    {formatTimestamp(chat.timestamp)}
+                                  </span>
+                                </div>
+                                <p
+                                  className={`text-sm truncate ${
+                                    !chat.is_read
+                                      ? "text-zinc-600 dark:text-zinc-300 font-medium"
+                                      : "text-zinc-500 dark:text-zinc-400"
+                                  }`}
+                                >
+                                  {getLastMessagePreview(chat)}
+                                </p>
+                              </div>
                             </div>
-                            {!chat.is_read && (
-                              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-600 border-2 border-white dark:border-zinc-900"></span>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2 mb-1">
-                              <h3
-                                className={`font-semibold truncate ${
-                                  !chat.is_read
-                                    ? "text-zinc-900 dark:text-white"
-                                    : "text-zinc-700 dark:text-zinc-300"
-                                }`}
-                              >
-                                {chat.name || "Unnamed Chat"}
-                              </h3>
-                              <span className="text-xs text-zinc-500 dark:text-zinc-400 flex-shrink-0">
-                                {formatTimestamp(chat.timestamp)}
-                              </span>
-                            </div>
-                            <p
-                              className={`text-sm truncate ${
-                                !chat.is_read
-                                  ? "text-zinc-600 dark:text-zinc-300 font-medium"
-                                  : "text-zinc-500 dark:text-zinc-400"
-                              }`}
-                            >
-                              {getLastMessagePreview(chat)}
-                            </p>
+                          </button>
+                          <div className="flex-shrink-0 px-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="p-2 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                                  aria-label="Chat options"
+                                >
+                                  <MoreVertical className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleIgnoreChat(chat.id, e as any);
+                                  }}
+                                  className="cursor-pointer"
+                                >
+                                  Ignore Chat
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                   {hasMore && (
