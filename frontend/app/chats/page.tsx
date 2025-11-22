@@ -519,6 +519,15 @@ export default function ChatsPage() {
                                 >
                                   {chat.name?.charAt(0).toUpperCase() || "?"}
                                 </div>
+                                {chat.assist_mode === "autopilot" && (
+                                  <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white dark:bg-zinc-900 rounded-full flex items-center justify-center shadow-lg border-2 border-white dark:border-zinc-800">
+                                    <img
+                                      src="/paper_airplane.svg"
+                                      alt="Autopilot"
+                                      className="w-4 h-4 text-slate-700 dark:text-slate-300"
+                                    />
+                                  </div>
+                                )}
                                 {!chat.is_read && (
                                   <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-600 border-2 border-white dark:border-zinc-900"></span>
                                 )}
@@ -613,28 +622,39 @@ export default function ChatsPage() {
 
                   <div className="bg-slate-700 px-4 py-3 shadow-lg">
                     <div className="flex items-center gap-3">
-                      {profilePictures[selectedChat.provider_id] ? (
-                        <img
-                          src={profilePictures[selectedChat.provider_id]}
-                          alt={selectedChat.name || "Profile"}
-                          className="w-10 h-10 rounded-full object-cover border-2 border-white/30 shadow-md"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                            const fallback = e.currentTarget
-                              .nextElementSibling as HTMLElement;
-                            if (fallback) fallback.style.display = "flex";
+                      <div className="relative">
+                        {profilePictures[selectedChat.provider_id] ? (
+                          <img
+                            src={profilePictures[selectedChat.provider_id]}
+                            alt={selectedChat.name || "Profile"}
+                            className="w-10 h-10 rounded-full object-cover border-2 border-white/30 shadow-md"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                              const fallback = e.currentTarget
+                                .nextElementSibling as HTMLElement;
+                              if (fallback) fallback.style.display = "flex";
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-lg flex items-center justify-center text-white text-lg font-bold"
+                          style={{
+                            display: profilePictures[selectedChat.provider_id]
+                              ? "none"
+                              : "flex",
                           }}
-                        />
-                      ) : null}
-                      <div
-                        className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-lg flex items-center justify-center text-white text-lg font-bold"
-                        style={{
-                          display: profilePictures[selectedChat.provider_id]
-                            ? "none"
-                            : "flex",
-                        }}
-                      >
-                        {selectedChat.name?.charAt(0).toUpperCase() || "?"}
+                        >
+                          {selectedChat.name?.charAt(0).toUpperCase() || "?"}
+                        </div>
+                        {selectedChat.assist_mode === "autopilot" && (
+                          <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white dark:bg-zinc-900 rounded-full flex items-center justify-center shadow-lg border-2 border-white/30">
+                            <img
+                              src="/paper_airplane.svg"
+                              alt="Autopilot"
+                              className="w-4 h-4 text-slate-700 dark:text-slate-300"
+                            />
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h2 className="text-base font-bold text-white truncate">

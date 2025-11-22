@@ -209,6 +209,15 @@ export default function IgnoredChatsPage() {
                                 >
                                   {chat.name?.charAt(0).toUpperCase() || "?"}
                                 </div>
+                                {chat.assist_mode === "autopilot" && (
+                                  <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white dark:bg-zinc-900 rounded-full flex items-center justify-center shadow-lg border-2 border-white dark:border-zinc-800 opacity-60">
+                                    <img
+                                      src="/paper_airplane.svg"
+                                      alt="Autopilot"
+                                      className="w-4 h-4 text-slate-700 dark:text-slate-300"
+                                    />
+                                  </div>
+                                )}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-2 mb-1 min-w-0">
