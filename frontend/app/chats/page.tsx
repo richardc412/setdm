@@ -78,6 +78,8 @@ export default function ChatsPage() {
     }, 100);
   };
 
+  const pendingMessageIdsRef = useRef<Set<string>>(new Set());
+
   const normalizeRealtimeMessage = (payload: MessageEventPayload): Message =>
     ({
       ...payload,
@@ -235,7 +237,9 @@ export default function ChatsPage() {
     } catch (error) {
       // Revert optimistic update
       setSelectedChat((prev) =>
-        prev && prev.id === chatId ? { ...prev, assist_mode: previousMode } : prev
+        prev && prev.id === chatId
+          ? { ...prev, assist_mode: previousMode }
+          : prev
       );
       setChats((prev) =>
         prev.map((chat) =>
@@ -263,90 +267,25 @@ export default function ChatsPage() {
         attachments: attachments.length > 0 ? attachments : undefined,
       });
 
-      // Optimistically add the message to local state immediately (201 response)
-      const optimisticMessage: Message = {
-        object: "Message",
-        id: response.message_id || `temp-${Date.now()}`,
-        account_id: selectedChat.account_id,
-        chat_id: selectedChat.id,
-        chat_provider_id: selectedChat.provider_id,
-        provider_id: response.message_id || `temp-${Date.now()}`,
-        sender_id: "self",
-        sender_attendee_id: "self",
-        text: text || null,
-        timestamp: new Date().toISOString(),
-        is_sender: 1,
-        attachments:
-          attachments.length > 0
-            ? attachments.map((file) => ({
-                type: "file",
-                file_name: file.name,
-                file_size: file.size,
-                mimetype: file.type,
-              }))
-            : [],
-        reactions: [],
-        seen: 0,
-        seen_by: {},
-        hidden: 0,
-        deleted: 0,
-        edited: 0,
-        is_event: 0,
-        delivered: 1,
-        behavior: null,
-        original: text || "",
-      };
-
-      // Add message to local state
-      setMessages((prev) => [...prev, optimisticMessage]);
-
-      // Scroll to bottom to show the new message
-      scrollMessagesToBottom();
-
-      // Reload messages in background to sync with server
-      // Wait longer for backend sync to complete (it triggers immediately after send)
-      const sentMessageId = response.message_id;
-      setTimeout(async () => {
-        try {
-          const messagesResponse = await getChatMessages(selectedChat.id, {
-            limit: 100,
-            order_desc: false,
-          });
-
-          // Check if our sent message is in the synced messages
-          const hasOurMessage = messagesResponse.items.some(
-            (msg) =>
-              msg.id === sentMessageId ||
-              (msg.text === text &&
-                msg.is_sender === 1 &&
-                Math.abs(new Date(msg.timestamp).getTime() - Date.now()) <
-                  10000)
-          );
-
-          if (hasOurMessage) {
-            // Message is synced, replace with server data
-            setMessages(messagesResponse.items);
-          } else {
-            // Message not synced yet, merge optimistic with synced messages
-            // Remove duplicates and keep optimistic message
-            const messageIds = new Set(messagesResponse.items.map((m) => m.id));
-            if (!messageIds.has(optimisticMessage.id)) {
-              setMessages([...messagesResponse.items, optimisticMessage]);
-            } else {
-              setMessages(messagesResponse.items);
-            }
+      const persisted = response.message;
+      if (persisted && persisted.id) {
+        // Mark as pending BEFORE adding to state to prevent websocket duplicates
+        pendingMessageIdsRef.current.add(persisted.id);
+        // Add to state - this is the single source of truth
+        setMessages((prev) => {
+          // Double-check we don't already have it (shouldn't happen, but be safe)
+          if (prev.some((msg) => msg.id === persisted.id)) {
+            return prev;
           }
+          return [...prev, persisted];
+        });
+        scrollMessagesToBottom();
 
-          // Scroll to bottom after reloading
-          scrollMessagesToBottom();
-
-          // Also refresh the chat list
-          loadChats();
-        } catch (error) {
-          console.error("Failed to sync messages:", error);
-          // On error, keep the optimistic message
-        }
-      }, 2000); // Increased to 2 seconds to give backend sync time to complete
+        // Clean up pending set after a delay to allow websocket to arrive and be ignored
+        setTimeout(() => {
+          pendingMessageIdsRef.current.delete(persisted.id);
+        }, 5000);
+      }
     } catch (err) {
       console.error("Failed to send message:", err);
       throw err; // Let the MessageInput component handle the error
@@ -398,12 +337,25 @@ export default function ChatsPage() {
         }
 
         if (selectedChatRef.current?.id === payload.chat_id) {
+          // Skip if this is a message we just sent (already in state from API response)
+          if (pendingMessageIdsRef.current.has(payload.id)) {
+            pendingMessageIdsRef.current.delete(payload.id);
+            // Still update chat timestamp but don't add duplicate message
+            setSelectedChat((prev) =>
+              prev
+                ? { ...prev, timestamp: payload.timestamp, is_read: true }
+                : prev
+            );
+            return;
+          }
+
           setSelectedChat((prev) =>
             prev
               ? { ...prev, timestamp: payload.timestamp, is_read: true }
               : prev
           );
           setMessages((prev) => {
+            // Double-check: skip if already in state
             if (prev.some((msg) => msg.id === payload.id)) {
               return prev;
             }

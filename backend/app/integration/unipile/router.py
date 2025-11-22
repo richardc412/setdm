@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Any
 import logging
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, Path, File, Form, UploadFile, Depends
@@ -6,7 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .client import list_all_chats, list_chat_messages, send_message, get_unipile_client
 from .schemas import ChatListResponse, MessageListResponse, MessageSentResponse
 from app.db.base import get_db
-from app.db.crud import create_pending_message, get_chat_by_id
+from app.db.crud import (
+    create_pending_message,
+    get_chat_by_id,
+    create_local_outbound_message,
+)
+from app.services.realtime import broadcast_new_message, serialize_message
 
 logger = logging.getLogger(__name__)
 
@@ -205,7 +210,43 @@ async def list_chat_attendees(
         )
 
 
-@router.post("/chats/{chat_id}/messages", response_model=MessageSentResponse, status_code=201)
+def _serialize_upload_metadata(upload: UploadFile, kind: str) -> dict[str, Any]:
+    """Convert an UploadFile object into a lightweight metadata structure."""
+    if not upload:
+        return {
+            "type": kind,
+            "file_name": kind,
+            "mimetype": "application/octet-stream",
+        }
+    return {
+        "type": kind,
+        "file_name": upload.filename or kind,
+        "mimetype": upload.content_type or "application/octet-stream",
+    }
+
+
+def _build_outbound_attachment_metadata(
+    attachments: Optional[list[UploadFile]],
+    voice_message: Optional[UploadFile],
+    video_message: Optional[UploadFile],
+) -> list[dict[str, Any]]:
+    """Collect outbound attachment metadata so we can store placeholders locally."""
+    metadata: list[dict[str, Any]] = []
+    if attachments:
+        for upload in attachments:
+            metadata.append(_serialize_upload_metadata(upload, "file"))
+    if voice_message:
+        metadata.append(_serialize_upload_metadata(voice_message, "voice_message"))
+    if video_message:
+        metadata.append(_serialize_upload_metadata(video_message, "video_message"))
+    return metadata
+
+
+class MessageSentWithPayload(MessageSentResponse):
+    message: dict[str, Any] | None = None
+
+
+@router.post("/chats/{chat_id}/messages", response_model=MessageSentWithPayload, status_code=201)
 async def send_message_in_chat(
     chat_id: str = Path(
         ...,
@@ -324,6 +365,8 @@ async def send_message_in_chat(
             typing_duration=typing_duration,
         )
         
+        sent_timestamp = datetime.utcnow().isoformat() + 'Z'
+
         # Add message to pending queue for batch processing
         try:
             if response.message_id:
@@ -332,7 +375,7 @@ async def send_message_in_chat(
                     message_id=response.message_id,
                     chat_id=chat_id,
                     text=text,
-                    timestamp=datetime.utcnow().isoformat() + 'Z',
+                    timestamp=sent_timestamp,
                 )
                 logger.info(f"Added message {response.message_id} to pending queue for chat {chat_id}")
             else:
@@ -340,8 +383,53 @@ async def send_message_in_chat(
         except Exception as queue_error:
             # Log but don't fail the request if queuing fails
             logger.error(f"Failed to queue message for chat {chat_id}: {str(queue_error)}")
+
+        # Persist the outbound message immediately so it appears in the UI even if Unipile drops it
+        persisted_message = None
+        if response.message_id and chat:
+            attachment_metadata = _build_outbound_attachment_metadata(
+                attachments,
+                voice_message,
+                video_message,
+            )
+            try:
+                persisted_message = await create_local_outbound_message(
+                    db=db,
+                    chat=chat,
+                    message_id=response.message_id,
+                    text=text,
+                    timestamp=sent_timestamp,
+                    attachments=attachment_metadata,
+                )
+            except Exception as persist_error:
+                logger.error(
+                    "Failed to persist outbound message %s for chat %s: %s",
+                    response.message_id,
+                    chat_id,
+                    persist_error,
+                )
+        elif not response.message_id:
+            logger.warning("Cannot persist outbound message for chat %s because message_id is missing", chat_id)
+        elif not chat:
+            logger.warning("Cannot persist outbound message for chat %s because chat record was not found", chat_id)
+
+        response_payload: dict[str, Any] | None = None
+        if persisted_message:
+            response_payload = serialize_message(persisted_message)
+            try:
+                await broadcast_new_message(persisted_message)
+            except Exception as broadcast_error:
+                logger.error(
+                    "Failed to broadcast outbound message %s: %s",
+                    persisted_message.id,
+                    broadcast_error,
+                )
         
-        return response
+        return MessageSentWithPayload(
+            object=response.object,
+            message_id=response.message_id,
+            message=response_payload,
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=500,

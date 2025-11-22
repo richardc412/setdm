@@ -1,6 +1,6 @@
 """CRUD operations for chats and messages."""
 import logging
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Any
 from datetime import datetime, timedelta
 
 from sqlalchemy import select, desc, and_, func
@@ -294,93 +294,113 @@ async def get_message_by_id(
     return result.scalar_one_or_none()
 
 
+def _message_schema_to_dict(message_data: Message) -> dict[str, Any]:
+    """Convert a Unipile Message schema into ORM-friendly dict data."""
+    attachments = [
+        att if isinstance(att, dict) else att.model_dump() for att in message_data.attachments
+    ]
+    reactions = [r.model_dump() for r in message_data.reactions]
+    return {
+        "chat_id": message_data.chat_id,
+        "account_id": message_data.account_id,
+        "chat_provider_id": message_data.chat_provider_id,
+        "provider_id": message_data.provider_id,
+        "sender_id": message_data.sender_id,
+        "sender_attendee_id": message_data.sender_attendee_id,
+        "text": message_data.text,
+        "timestamp": message_data.timestamp,
+        "is_sender": message_data.is_sender,
+        "attachments": attachments,
+        "reactions": reactions,
+        "seen_by": message_data.seen_by,
+        "quoted": message_data.quoted.model_dump() if message_data.quoted else None,
+        "reply_to": message_data.reply_to.model_dump() if message_data.reply_to else None,
+        "seen": message_data.seen,
+        "hidden": message_data.hidden,
+        "deleted": message_data.deleted,
+        "edited": message_data.edited,
+        "is_event": message_data.is_event,
+        "delivered": message_data.delivered,
+        "behavior": message_data.behavior,
+        "original": message_data.original,
+        "event_type": message_data.event_type,
+        "replies": message_data.replies,
+        "reply_by": message_data.reply_by,
+        "parent": message_data.parent,
+        "subject": message_data.subject,
+        "message_type": message_data.message_type,
+        "attendee_type": message_data.attendee_type,
+        "attendee_distance": message_data.attendee_distance,
+        "sender_urn": message_data.sender_urn,
+    }
+
+
+async def _find_existing_message(
+    db: AsyncSession,
+    message_id: Optional[str],
+    provider_id: Optional[str],
+) -> Optional[MessageModel]:
+    """Find an existing message by primary key or provider_id."""
+    if message_id:
+        result = await db.execute(
+            select(MessageModel).where(MessageModel.id == message_id)
+        )
+        message = result.scalar_one_or_none()
+        if message:
+            return message
+    if provider_id:
+        result = await db.execute(
+            select(MessageModel).where(MessageModel.provider_id == provider_id)
+        )
+        return result.scalar_one_or_none()
+    return None
+
+
 async def create_message(
     db: AsyncSession,
     message_data: Message,
 ) -> Optional[MessageModel]:
     """
     Create a new message if it doesn't already exist.
-    Uses provider_id for deduplication.
-    
-    Args:
-        db: Database session
-        message_data: Message data from Unipile API
-        
-    Returns:
-        MessageModel instance or None if message already exists
+    If a matching message exists, update its metadata in-place.
     """
-    # Check if message already exists by provider_id
-    result = await db.execute(
-        select(MessageModel).where(MessageModel.provider_id == message_data.provider_id)
-    )
-    existing_message = result.scalar_one_or_none()
-    
-    if existing_message:
-        return None  # Message already exists, skip
-    
     # Resolve sender_id: use attendee's provider_id if available
     resolved_sender_id = message_data.sender_id
     if message_data.sender_attendee_id:
         attendee = await get_attendee_by_id(db, message_data.sender_attendee_id)
         if attendee and attendee.provider_id:
             resolved_sender_id = attendee.provider_id
-    
+
     # Check if this message exists in pending_messages to correctly set is_sender
     # Unipile sometimes returns is_sender=0 for messages we sent, so we need to override it
-    is_sender_value = message_data.is_sender
     pending_check = await db.execute(
         select(PendingMessageModel).where(PendingMessageModel.message_id == message_data.id)
     )
     pending_message = pending_check.scalar_one_or_none()
+    is_sender_value = message_data.is_sender
     if pending_message:
-        # This is a message we sent - override is_sender to 1
         is_sender_value = 1
         logger.info(f"Message {message_data.id} found in pending queue, setting is_sender=1")
-    
-    # Convert Pydantic models to dicts for JSON fields
-    attachments = [att if isinstance(att, dict) else att.model_dump() for att in message_data.attachments]
-    reactions = [r.model_dump() for r in message_data.reactions]
-    
-    # Create new message
+
+    existing_message = await _find_existing_message(db, message_data.id, message_data.provider_id)
+    payload = _message_schema_to_dict(message_data)
+    payload["sender_id"] = resolved_sender_id
+    payload["is_sender"] = is_sender_value
+
+    if existing_message:
+        for key, value in payload.items():
+            setattr(existing_message, key, value)
+        await db.commit()
+        await db.refresh(existing_message)
+        return None
+
     message = MessageModel(
         id=message_data.id,
-        chat_id=message_data.chat_id,
-        account_id=message_data.account_id,
-        chat_provider_id=message_data.chat_provider_id,
-        provider_id=message_data.provider_id,
-        sender_id=resolved_sender_id,
-        sender_attendee_id=message_data.sender_attendee_id,
-        text=message_data.text,
-        timestamp=message_data.timestamp,
-        is_sender=is_sender_value,
-        attachments=attachments,
-        reactions=reactions,
-        seen_by=message_data.seen_by,
-        quoted=message_data.quoted.model_dump() if message_data.quoted else None,
-        reply_to=message_data.reply_to.model_dump() if message_data.reply_to else None,
-        seen=message_data.seen,
-        hidden=message_data.hidden,
-        deleted=message_data.deleted,
-        edited=message_data.edited,
-        is_event=message_data.is_event,
-        delivered=message_data.delivered,
-        behavior=message_data.behavior,
-        original=message_data.original,
-        event_type=message_data.event_type,
-        replies=message_data.replies,
-        reply_by=message_data.reply_by,
-        parent=message_data.parent,
-        subject=message_data.subject,
-        message_type=message_data.message_type,
-        attendee_type=message_data.attendee_type,
-        attendee_distance=message_data.attendee_distance,
-        sender_urn=message_data.sender_urn,
+        **payload,
     )
-    
     db.add(message)
     await db.commit()
     await db.refresh(message)
-    
     return message
 
 
@@ -414,6 +434,72 @@ async def get_messages_by_chat(
         .offset(offset)
     )
     return result.scalars().all()
+
+
+async def create_local_outbound_message(
+    db: AsyncSession,
+    chat: ChatModel,
+    message_id: str,
+    text: Optional[str],
+    timestamp: str,
+    attachments: Optional[list[dict[str, Any]]] = None,
+) -> MessageModel:
+    """
+    Create or update a locally sent message immediately after a successful send.
+    """
+    if not message_id:
+        raise ValueError("message_id is required to persist outbound messages")
+
+    payload = {
+        "chat_id": chat.id,
+        "account_id": chat.account_id,
+        "chat_provider_id": chat.provider_id,
+        "provider_id": message_id,
+        "sender_id": "self",
+        "sender_attendee_id": "self",
+        "text": text,
+        "timestamp": timestamp,
+        "is_sender": 1,
+        "attachments": attachments or [],
+        "reactions": [],
+        "seen_by": {},
+        "quoted": None,
+        "reply_to": None,
+        "seen": 0,
+        "hidden": 0,
+        "deleted": 0,
+        "edited": 0,
+        "is_event": 0,
+        "delivered": 1,
+        "behavior": None,
+        "original": text or "",
+        "event_type": None,
+        "replies": None,
+        "reply_by": None,
+        "parent": None,
+        "subject": None,
+        "message_type": None,
+        "attendee_type": None,
+        "attendee_distance": None,
+        "sender_urn": None,
+    }
+
+    existing = await get_message_by_id(db, message_id)
+    if existing:
+        for key, value in payload.items():
+            setattr(existing, key, value)
+        await db.commit()
+        await db.refresh(existing)
+        return existing
+
+    message = MessageModel(
+        id=message_id,
+        **payload,
+    )
+    db.add(message)
+    await db.commit()
+    await db.refresh(message)
+    return message
 
 
 async def get_latest_message(

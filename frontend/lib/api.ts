@@ -55,7 +55,9 @@ export async function login(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Login failed" }));
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Login failed" }));
     throw new ApiError(response.status, error.detail || "Login failed");
   }
 
@@ -75,7 +77,9 @@ export async function register(data: RegisterData): Promise<User> {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Registration failed" }));
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Registration failed" }));
     throw new ApiError(response.status, error.detail || "Registration failed");
   }
 
@@ -94,7 +98,9 @@ export async function getCurrentUser(token: string): Promise<User> {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Failed to fetch user" }));
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Failed to fetch user" }));
     throw new ApiError(response.status, error.detail || "Failed to fetch user");
   }
 
@@ -155,37 +161,46 @@ export interface ChatFilters {
 /**
  * Fetch all chats from persistence layer
  */
-export async function getChats(filters?: ChatFilters): Promise<ChatListResponse> {
+export async function getChats(
+  filters?: ChatFilters
+): Promise<ChatListResponse> {
   const params = new URLSearchParams();
-  
+
   if (filters?.is_read !== undefined) {
-    params.append('is_read', String(filters.is_read));
+    params.append("is_read", String(filters.is_read));
   }
   if (filters?.is_ignored !== undefined) {
-    params.append('is_ignored', String(filters.is_ignored));
+    params.append("is_ignored", String(filters.is_ignored));
   }
   if (filters?.account_id) {
-    params.append('account_id', filters.account_id);
+    params.append("account_id", filters.account_id);
   }
   if (filters?.limit) {
-    params.append('limit', String(filters.limit));
+    params.append("limit", String(filters.limit));
   }
   if (filters?.offset) {
-    params.append('offset', String(filters.offset));
+    params.append("offset", String(filters.offset));
   }
 
-  const url = `${API_BASE_URL}/api/chats${params.toString() ? '?' + params.toString() : ''}`;
-  
+  const url = `${API_BASE_URL}/api/chats${
+    params.toString() ? "?" + params.toString() : ""
+  }`;
+
   const response = await fetch(url, {
-    method: 'GET',
+    method: "GET",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Failed to fetch chats' }));
-    throw new ApiError(response.status, error.detail || 'Failed to fetch chats');
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Failed to fetch chats" }));
+    throw new ApiError(
+      response.status,
+      error.detail || "Failed to fetch chats"
+    );
   }
 
   return response.json();
@@ -195,16 +210,24 @@ export async function getChats(filters?: ChatFilters): Promise<ChatListResponse>
  * Mark a chat as read
  */
 export async function markChatAsRead(chatId: string): Promise<Chat> {
-  const response = await fetch(`${API_BASE_URL}/api/chats/${chatId}/mark-read`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/api/chats/${chatId}/mark-read`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Failed to mark chat as read' }));
-    throw new ApiError(response.status, error.detail || 'Failed to mark chat as read');
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Failed to mark chat as read" }));
+    throw new ApiError(
+      response.status,
+      error.detail || "Failed to mark chat as read"
+    );
   }
 
   return response.json();
@@ -215,15 +238,20 @@ export async function markChatAsRead(chatId: string): Promise<Chat> {
  */
 export async function ignoreChat(chatId: string): Promise<Chat> {
   const response = await fetch(`${API_BASE_URL}/api/chats/${chatId}/ignore`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Failed to ignore chat' }));
-    throw new ApiError(response.status, error.detail || 'Failed to ignore chat');
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Failed to ignore chat" }));
+    throw new ApiError(
+      response.status,
+      error.detail || "Failed to ignore chat"
+    );
   }
 
   return response.json();
@@ -234,15 +262,20 @@ export async function ignoreChat(chatId: string): Promise<Chat> {
  */
 export async function unignoreChat(chatId: string): Promise<Chat> {
   const response = await fetch(`${API_BASE_URL}/api/chats/${chatId}/unignore`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Failed to unignore chat' }));
-    throw new ApiError(response.status, error.detail || 'Failed to unignore chat');
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Failed to unignore chat" }));
+    throw new ApiError(
+      response.status,
+      error.detail || "Failed to unignore chat"
+    );
   }
 
   return response.json();
@@ -251,7 +284,9 @@ export async function unignoreChat(chatId: string): Promise<Chat> {
 /**
  * Get ignored chats
  */
-export async function getIgnoredChats(filters?: Omit<ChatFilters, 'is_ignored'>): Promise<ChatListResponse> {
+export async function getIgnoredChats(
+  filters?: Omit<ChatFilters, "is_ignored">
+): Promise<ChatListResponse> {
   return getChats({ ...filters, is_ignored: true });
 }
 
@@ -277,16 +312,21 @@ export async function getChatAttendee(
   const response = await fetch(
     `${API_BASE_URL}/api/chats/${chatId}/attendee/${providerId}`,
     {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     }
   );
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Failed to fetch attendee' }));
-    throw new ApiError(response.status, error.detail || 'Failed to fetch attendee');
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Failed to fetch attendee" }));
+    throw new ApiError(
+      response.status,
+      error.detail || "Failed to fetch attendee"
+    );
   }
 
   return response.json();
@@ -369,29 +409,36 @@ export async function getChatMessages(
   filters?: MessageFilters
 ): Promise<MessageListResponse> {
   const params = new URLSearchParams();
-  
+
   if (filters?.limit) {
-    params.append('limit', String(filters.limit));
+    params.append("limit", String(filters.limit));
   }
   if (filters?.offset) {
-    params.append('offset', String(filters.offset));
+    params.append("offset", String(filters.offset));
   }
   if (filters?.order_desc !== undefined) {
-    params.append('order_desc', String(filters.order_desc));
+    params.append("order_desc", String(filters.order_desc));
   }
 
-  const url = `${API_BASE_URL}/api/chats/${chatId}/messages${params.toString() ? '?' + params.toString() : ''}`;
-  
+  const url = `${API_BASE_URL}/api/chats/${chatId}/messages${
+    params.toString() ? "?" + params.toString() : ""
+  }`;
+
   const response = await fetch(url, {
-    method: 'GET',
+    method: "GET",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Failed to fetch messages' }));
-    throw new ApiError(response.status, error.detail || 'Failed to fetch messages');
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Failed to fetch messages" }));
+    throw new ApiError(
+      response.status,
+      error.detail || "Failed to fetch messages"
+    );
   }
 
   return response.json();
@@ -445,6 +492,7 @@ export interface SendMessageRequest {
 export interface SendMessageResponse {
   object: string;
   message_id: string | null;
+  message?: Message | null;
 }
 
 /**
@@ -486,46 +534,53 @@ export async function sendMessage(
   request: SendMessageRequest
 ): Promise<SendMessageResponse> {
   const formData = new FormData();
-  
+
   if (request.text) {
-    formData.append('text', request.text);
+    formData.append("text", request.text);
   }
   if (request.account_id) {
-    formData.append('account_id', request.account_id);
+    formData.append("account_id", request.account_id);
   }
   if (request.thread_id) {
-    formData.append('thread_id', request.thread_id);
+    formData.append("thread_id", request.thread_id);
   }
   if (request.quote_id) {
-    formData.append('quote_id', request.quote_id);
+    formData.append("quote_id", request.quote_id);
   }
   if (request.typing_duration) {
-    formData.append('typing_duration', request.typing_duration);
+    formData.append("typing_duration", request.typing_duration);
   }
   if (request.voice_message) {
-    formData.append('voice_message', request.voice_message);
+    formData.append("voice_message", request.voice_message);
   }
   if (request.video_message) {
-    formData.append('video_message', request.video_message);
+    formData.append("video_message", request.video_message);
   }
   if (request.attachments && request.attachments.length > 0) {
     request.attachments.forEach((file) => {
-      formData.append('attachments', file);
+      formData.append("attachments", file);
     });
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/unipile/chats/${chatId}/messages`, {
-    method: 'POST',
-    body: formData,
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/api/unipile/chats/${chatId}/messages`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Failed to send message' }));
-    throw new ApiError(response.status, error.detail || 'Failed to send message');
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Failed to send message" }));
+    throw new ApiError(
+      response.status,
+      error.detail || "Failed to send message"
+    );
   }
 
   return response.json();
 }
 
 export { ApiError };
-

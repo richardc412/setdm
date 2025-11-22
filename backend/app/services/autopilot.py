@@ -4,8 +4,6 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from typing import Optional
-from uuid import uuid4
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -14,6 +12,7 @@ from app.db.crud import (
     get_chat_by_id,
     get_latest_message,
     get_messages_by_chat,
+    create_local_outbound_message,
 )
 from app.db.models import MessageModel
 from app.integration.unipile import send_message
@@ -86,13 +85,34 @@ async def maybe_send_autopilot_reply(
         logger.error("Failed to send autopilot reply for chat %s: %s", chat.id, exc)
         return
     
-    message_id = send_response.message_id or f"autopilot-{uuid4()}"
+    if not send_response.message_id:
+        logger.warning("Autopilot reply sent for chat %s but no message_id returned", chat.id)
+        return
+
     timestamp = datetime.utcnow().isoformat() + "Z"
+
+    persisted_message: MessageModel | None = None
+    try:
+        persisted_message = await create_local_outbound_message(
+            db=db,
+            chat=chat,
+            message_id=send_response.message_id,
+            text=suggestion,
+            timestamp=timestamp,
+            attachments=[],
+        )
+    except Exception as exc:
+        logger.error(
+            "Autopilot reply %s for chat %s failed to persist locally: %s",
+            send_response.message_id,
+            chat.id,
+            exc,
+        )
     
     try:
         await create_pending_message(
             db=db,
-            message_id=message_id,
+            message_id=send_response.message_id,
             chat_id=chat.id,
             text=suggestion,
             timestamp=timestamp,
@@ -100,35 +120,10 @@ async def maybe_send_autopilot_reply(
     except Exception as exc:
         logger.warning(
             "Autopilot reply sent but failed to enqueue pending message %s: %s",
-            message_id,
+            send_response.message_id,
             exc,
         )
     
-    # Broadcast a realtime event so the UI reflects the AI response immediately.
-    fake_message = MessageModel(
-        id=message_id,
-        chat_id=chat.id,
-        account_id=chat.account_id,
-        chat_provider_id=chat.provider_id,
-        provider_id=message_id,
-        sender_id="self",
-        sender_attendee_id="self",
-        text=suggestion,
-        timestamp=timestamp,
-        is_sender=1,
-        attachments=[],
-        reactions=[],
-        seen=0,
-        seen_by={},
-        hidden=0,
-        deleted=0,
-        edited=0,
-        is_event=0,
-        delivered=1,
-        behavior=None,
-        original=suggestion,
-    )
-    fake_message.created_at = datetime.utcnow()
-    
-    await broadcast_new_message(fake_message)
+    if persisted_message:
+        await broadcast_new_message(persisted_message)
 
