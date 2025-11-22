@@ -103,6 +103,7 @@ async def maybe_send_autopilot_reply(
             text=suggestion,
             timestamp=timestamp,
             attachments=[],
+            sent_by_autopilot=True,
         )
     except Exception as exc:
         logger.error(

@@ -53,6 +53,7 @@ class MessageResponse(BaseModel):
     edited: int
     is_event: int
     delivered: int
+    sent_by_autopilot: bool
     created_at: datetime
 
     class Config:

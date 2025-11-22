@@ -99,6 +99,13 @@ class MessageModel(Base):
     edited: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_event: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     delivered: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sent_by_autopilot: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default="false",
+        index=True,
+    )
     
     # Optional Unipile fields
     behavior: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -120,7 +127,10 @@ class MessageModel(Base):
     chat: Mapped["ChatModel"] = relationship("ChatModel", back_populates="messages")
 
     def __repr__(self) -> str:
-        return f"<MessageModel(id={self.id}, chat_id={self.chat_id}, timestamp={self.timestamp})>"
+        return (
+            f"<MessageModel(id={self.id}, chat_id={self.chat_id}, "
+            f"timestamp={self.timestamp}, sent_by_autopilot={self.sent_by_autopilot})>"
+        )
 
 
 class ChatAttendeeModel(Base):

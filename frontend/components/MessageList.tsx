@@ -200,6 +200,11 @@ export function MessageList({ messages, loading }: MessageListProps) {
                           : "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700"
                       } rounded-2xl px-4 py-2.5 shadow-md`}
                     >
+                      {message.sent_by_autopilot && (
+                        <span className="block text-[10px] uppercase tracking-wide text-amber-300 mb-1 text-right">
+                          Autopilot
+                        </span>
+                      )}
                       {/* Message text */}
                       {message.text && (
                         <p className="text-[15px] leading-snug whitespace-pre-wrap break-words">

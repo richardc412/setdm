@@ -362,6 +362,7 @@ export interface Message {
   edited: number;
   is_event: number;
   delivered: number;
+  sent_by_autopilot: boolean;
   behavior: number | null;
   original: string;
   quoted?: any;

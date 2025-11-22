@@ -91,6 +91,7 @@ def serialize_message(message: MessageModel) -> Dict[str, Any]:
         "edited": message.edited,
         "is_event": message.is_event,
         "delivered": message.delivered,
+        "sent_by_autopilot": message.sent_by_autopilot,
         "behavior": message.behavior,
         "original": message.original,
         "quoted": message.quoted,

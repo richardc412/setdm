@@ -182,6 +182,7 @@ async def list_chat_messages(
                 edited=0,
                 is_event=0,
                 delivered=1,
+                sent_by_autopilot=False,
                 created_at=pending_msg.created_at,
             ))
         

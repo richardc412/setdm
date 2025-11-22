@@ -443,6 +443,7 @@ async def create_local_outbound_message(
     text: Optional[str],
     timestamp: str,
     attachments: Optional[list[dict[str, Any]]] = None,
+    sent_by_autopilot: bool = False,
 ) -> MessageModel:
     """
     Create or update a locally sent message immediately after a successful send.
@@ -482,6 +483,7 @@ async def create_local_outbound_message(
         "attendee_type": None,
         "attendee_distance": None,
         "sender_urn": None,
+        "sent_by_autopilot": sent_by_autopilot,
     }
 
     existing = await get_message_by_id(db, message_id)
