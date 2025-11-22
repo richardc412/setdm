@@ -402,7 +402,7 @@ export default function ChatsPage() {
         <AppHeader />
 
         {/* Main Content */}
-        <div className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full">
+        <div className="flex-1 flex overflow-hidden w-full">
           {/* Sidebar - Chat List */}
           <aside className="w-96 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col shadow-xl overflow-hidden">
             {/* Filters */}

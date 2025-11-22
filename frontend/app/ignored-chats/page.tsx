@@ -105,9 +105,9 @@ export default function IgnoredChatsPage() {
         <AppHeader />
 
         {/* Main Content */}
-        <div className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full">
+        <div className="flex-1 flex overflow-hidden w-full">
           {/* Ignored Chats List */}
-          <div className="flex-1 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col shadow-xl overflow-hidden">
+          <div className="w-96 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col shadow-xl overflow-hidden">
             {/* Header */}
             <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
               <div className="flex items-center gap-3">
@@ -247,21 +247,8 @@ export default function IgnoredChatsPage() {
           </div>
 
           {/* Info Panel */}
-          <div className="flex-1 flex items-center justify-center bg-zinc-100 dark:bg-zinc-950 p-4">
-            <div className="text-center max-w-md p-8">
-              <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-slate-700 flex items-center justify-center shadow-2xl">
-                <span className="text-5xl">🔇</span>
-              </div>
-              <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
-                Ignored Chats
-              </h2>
-              <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-                These chats have been ignored and won't appear in your main chat list.
-              </p>
-              <p className="text-sm text-zinc-500 dark:text-zinc-500">
-                Click the menu button next to any chat to unignore it and bring it back to your main chats.
-              </p>
-            </div>
+          <div className="flex-1 bg-zinc-50 dark:bg-zinc-950">
+            {/* Reserved for future features */}
           </div>
         </div>
       </div>
