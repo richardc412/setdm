@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .client import list_all_chats, list_chat_messages, send_message, get_unipile_client
 from .schemas import ChatListResponse, MessageListResponse, MessageSentResponse
 from app.db.base import get_db
-from app.db.crud import create_pending_message
+from app.db.crud import create_pending_message, get_chat_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -276,6 +276,14 @@ async def send_message_in_chat(
     ```
     """
     try:
+        # Check if chat exists and is not ignored
+        chat = await get_chat_by_id(db, chat_id)
+        if chat and chat.is_ignored:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Cannot send messages to ignored chat. Please unignore the chat first."
+            )
+        
         # Prepare file tuples if files are provided
         voice_msg_tuple = None
         if voice_message:

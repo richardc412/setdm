@@ -165,6 +165,14 @@ export default function ChatsPage() {
   };
 
   const handleChatSelect = async (chat: Chat) => {
+    // Hard lock: prevent selecting ignored chats
+    if (chat.is_ignored) {
+      alert(
+        "This chat is ignored. Please unignore it first from the Ignored Chats page."
+      );
+      return;
+    }
+
     setSelectedChat(chat);
     loadMessages(chat.id);
 
@@ -185,7 +193,7 @@ export default function ChatsPage() {
 
   const handleIgnoreChat = async (chatId: string, event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent chat selection
-    
+
     try {
       await ignoreChat(chatId);
       // Remove the chat from the list
@@ -203,6 +211,13 @@ export default function ChatsPage() {
 
   const handleSendMessage = async (text: string, attachments: File[]) => {
     if (!selectedChat) return;
+
+    // Hard lock: prevent sending messages to ignored chats
+    if (selectedChat.is_ignored) {
+      throw new Error(
+        "Cannot send messages to ignored chats. Please unignore the chat first."
+      );
+    }
 
     try {
       // Send message via Unipile API
@@ -499,13 +514,16 @@ export default function ChatsPage() {
                                       e.currentTarget.style.display = "none";
                                       const fallback = e.currentTarget
                                         .nextElementSibling as HTMLElement;
-                                      if (fallback) fallback.style.display = "flex";
+                                      if (fallback)
+                                        fallback.style.display = "flex";
                                     }}
                                   />
                                 ) : null}
                                 <div
                                   className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-white text-xl font-bold shadow-lg"
-                                  style={{ display: profilePic ? "none" : "flex" }}
+                                  style={{
+                                    display: profilePic ? "none" : "flex",
+                                  }}
                                 >
                                   {chat.name?.charAt(0).toUpperCase() || "?"}
                                 </div>
@@ -589,36 +607,49 @@ export default function ChatsPage() {
             {selectedChat ? (
               <div className="w-full max-w-2xl h-full flex flex-col bg-white dark:bg-zinc-900 shadow-2xl overflow-hidden border-r border-zinc-200 dark:border-zinc-800">
                 {/* Chat Header */}
-                <div className="bg-slate-700 px-4 py-3 shadow-lg">
-                  <div className="flex items-center gap-3">
-                    {profilePictures[selectedChat.provider_id] ? (
-                      <img
-                        src={profilePictures[selectedChat.provider_id]}
-                        alt={selectedChat.name || "Profile"}
-                        className="w-10 h-10 rounded-full object-cover border-2 border-white/30 shadow-md"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                          const fallback = e.currentTarget
-                            .nextElementSibling as HTMLElement;
-                          if (fallback) fallback.style.display = "flex";
-                        }}
-                      />
-                    ) : null}
-                    <div
-                      className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-lg flex items-center justify-center text-white text-lg font-bold"
-                      style={{
-                        display: profilePictures[selectedChat.provider_id]
-                          ? "none"
-                          : "flex",
-                      }}
-                    >
-                      {selectedChat.name?.charAt(0).toUpperCase() || "?"}
+                <div>
+                  {/* Ignored Chat Warning */}
+                  {selectedChat.is_ignored && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 px-4 py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-yellow-700 dark:text-yellow-400 text-sm font-medium">
+                          ⚠️ This chat is ignored. Unignore it to send messages.
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h2 className="text-base font-bold text-white truncate">
-                        {selectedChat.name || "Unnamed Chat"}
-                      </h2>
-                      <p className="text-xs text-white/80">Instagram</p>
+                  )}
+
+                  <div className="bg-slate-700 px-4 py-3 shadow-lg">
+                    <div className="flex items-center gap-3">
+                      {profilePictures[selectedChat.provider_id] ? (
+                        <img
+                          src={profilePictures[selectedChat.provider_id]}
+                          alt={selectedChat.name || "Profile"}
+                          className="w-10 h-10 rounded-full object-cover border-2 border-white/30 shadow-md"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                            const fallback = e.currentTarget
+                              .nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = "flex";
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-lg flex items-center justify-center text-white text-lg font-bold"
+                        style={{
+                          display: profilePictures[selectedChat.provider_id]
+                            ? "none"
+                            : "flex",
+                        }}
+                      >
+                        {selectedChat.name?.charAt(0).toUpperCase() || "?"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h2 className="text-base font-bold text-white truncate">
+                          {selectedChat.name || "Unnamed Chat"}
+                        </h2>
+                        <p className="text-xs text-white/80">Instagram</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -653,7 +684,7 @@ export default function ChatsPage() {
                     {/* Message Input */}
                     <MessageInput
                       onSendMessage={handleSendMessage}
-                      disabled={messagesLoading}
+                      disabled={messagesLoading || selectedChat.is_ignored}
                     />
                   </>
                 )}
@@ -673,7 +704,7 @@ export default function ChatsPage() {
                 </div>
               </div>
             )}
-            
+
             {/* Right panel - space for future features */}
             <div className="flex-1 bg-zinc-50 dark:bg-zinc-950">
               {/* Reserved for future features */}
