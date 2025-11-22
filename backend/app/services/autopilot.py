@@ -58,13 +58,16 @@ async def maybe_send_autopilot_reply(
         db,
         chat_id=chat.id,
         limit=history_limit,
-        order_desc=False,
+        order_desc=True,
     )
+    
+    # Reverse to chronological order (oldest first)
+    chronological_messages = list(reversed(messages))
     
     try:
         suggestion = await generate_sales_response(
             chat,
-            messages,
+            chronological_messages,
             autopilot_prompt,
             history_limit=history_limit,
         )
