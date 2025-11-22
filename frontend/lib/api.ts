@@ -120,6 +120,8 @@ export async function logout(): Promise<void> {
 /**
  * Chat API Types and Functions (from persistence layer)
  */
+export type AssistMode = "manual" | "ai-assisted" | "autopilot";
+
 export interface Chat {
   id: string;
   account_id: string;
@@ -130,6 +132,7 @@ export interface Chat {
   unread_count: number;
   is_read: boolean;
   is_ignored: boolean;
+  assist_mode: AssistMode;
   created_at: string;
   updated_at: string;
 }
@@ -442,6 +445,37 @@ export interface SendMessageRequest {
 export interface SendMessageResponse {
   object: string;
   message_id: string | null;
+}
+
+/**
+ * Update the assist/autopilot mode for a chat
+ */
+export async function updateChatAssistMode(
+  chatId: string,
+  assistMode: AssistMode
+): Promise<Chat> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/chats/${chatId}/assist-mode`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ assist_mode: assistMode }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({
+      detail: "Failed to update assist mode",
+    }));
+    throw new ApiError(
+      response.status,
+      error.detail || "Failed to update assist mode"
+    );
+  }
+
+  return response.json();
 }
 
 /**

@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     openai_history_limit: int = 20
+    autopilot_prompt: str = (
+        "You are SetDM Autopilot. Craft concise, friendly replies that move the "
+        "conversation toward booking a meeting and keep the tone confident yet helpful."
+    )
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,

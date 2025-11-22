@@ -16,16 +16,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Loader2, Paperclip, Send } from "lucide-react";
-import { ApiError, generateSuggestedMessage } from "@/lib/api";
+import { ApiError, AssistMode, generateSuggestedMessage } from "@/lib/api";
 import { useAiConfig } from "@/contexts/AiConfigContext";
 
 interface MessageInputProps {
   onSendMessage: (text: string, attachments: File[]) => Promise<void>;
   disabled?: boolean;
   chatId?: string;
+  assistMode: AssistMode;
+  onAssistModeChange: (mode: AssistMode) => Promise<void>;
 }
-
-type AssistMode = "manual" | "ai-assisted" | "autopilot";
 
 const MODE_LABELS: Record<AssistMode, string> = {
   manual: "Manual",
@@ -37,13 +37,16 @@ export function MessageInput({
   onSendMessage,
   disabled,
   chatId,
+  assistMode,
+  onAssistModeChange,
 }: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [assistMode, setAssistMode] = useState<AssistMode>("manual");
+  const [modeUpdating, setModeUpdating] = useState(false);
+  const [modeError, setModeError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { prompt: aiPrompt, isLoaded: aiConfigLoaded } = useAiConfig();
 
@@ -131,6 +134,23 @@ export function MessageInput({
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleAssistModeSelect = async (mode: AssistMode) => {
+    if (mode === assistMode) {
+      return;
+    }
+    setModeError(null);
+    setModeUpdating(true);
+    try {
+      await onAssistModeChange(mode);
+    } catch (err) {
+      const friendly =
+        err instanceof Error ? err.message : "Failed to update assist mode.";
+      setModeError(friendly);
+    } finally {
+      setModeUpdating(false);
+    }
+  };
+
   return (
     <div className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
       {/* Attachment Preview */}
@@ -188,17 +208,25 @@ export function MessageInput({
                   size="sm"
                   variant="outline"
                   className="gap-1 text-xs font-medium"
-                  disabled={disabled || sending || suggesting}
+                  disabled={disabled || sending || suggesting || modeUpdating}
                 >
-                  {MODE_LABELS[assistMode]}
-                  <ChevronDown className="size-3.5 opacity-70" />
+                  {modeUpdating ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <>
+                      {MODE_LABELS[assistMode]}
+                      <ChevronDown className="size-3.5 opacity-70" />
+                    </>
+                  )}
                 </InputGroupButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
                 <DropdownMenuLabel>Response mode</DropdownMenuLabel>
                 <DropdownMenuRadioGroup
                   value={assistMode}
-                  onValueChange={(value) => setAssistMode(value as AssistMode)}
+                  onValueChange={(value) =>
+                    handleAssistModeSelect(value as AssistMode)
+                  }
                 >
                   <DropdownMenuRadioItem value="manual">
                     <div className="flex flex-col text-left">
@@ -286,6 +314,21 @@ export function MessageInput({
         <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
         </div>
+      )}
+
+      {modeError && (
+        <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            {modeError}
+          </p>
+        </div>
+      )}
+
+      {assistMode === "autopilot" && (
+        <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+          Autopilot will reply automatically when new messages arrive. You can
+          still send manual responses anytime.
+        </p>
       )}
 
       {/* Hint Text */}

@@ -17,6 +17,7 @@ from app.db.crud import (
     get_attendee_by_provider_id,
     upsert_attendee,
     get_pending_messages,
+    update_chat_assist_mode,
 )
 from app.services.message_sync import sync_chat_messages, sync_all_chat_messages
 from app.integration.unipile.client import get_unipile_client
@@ -28,6 +29,7 @@ from app.features.chats.schemas import (
     SyncResponse,
     GenerateResponseRequest,
     GenerateResponsePayload,
+    UpdateAssistModeRequest,
 )
 from app.services.ai_assistant import generate_sales_response, AISuggestionError
 from app.core.config import get_settings
@@ -283,6 +285,29 @@ async def mark_chat_read(
     except Exception as e:
         logger.error(f"Error marking chat {chat_id} as read: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to mark chat as read: {str(e)}")
+
+
+@router.post("/{chat_id}/assist-mode", response_model=ChatResponse)
+async def set_chat_assist_mode(
+    chat_id: str,
+    request: UpdateAssistModeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Update the assist/autopilot mode for a chat.
+    """
+    try:
+        chat = await update_chat_assist_mode(db, chat_id, request.assist_mode)
+        
+        if not chat:
+            raise HTTPException(status_code=404, detail=f"Chat {chat_id} not found")
+        
+        return ChatResponse.model_validate(chat)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating assist mode for chat {chat_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update assist mode: {str(e)}")
 
 
 @router.post("/{chat_id}/ignore", response_model=ChatResponse)

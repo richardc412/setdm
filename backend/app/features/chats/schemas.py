@@ -1,7 +1,10 @@
 """Pydantic schemas for chats API."""
-from typing import Optional, Any
+from typing import Optional, Any, Literal
 from datetime import datetime
 from pydantic import BaseModel, Field
+
+
+AssistMode = Literal["manual", "ai-assisted", "autopilot"]
 
 
 class ChatResponse(BaseModel):
@@ -15,6 +18,7 @@ class ChatResponse(BaseModel):
     unread_count: int
     is_read: bool
     is_ignored: bool
+    assist_mode: AssistMode
     created_at: datetime
     updated_at: datetime
 
@@ -90,5 +94,10 @@ class GenerateResponsePayload(BaseModel):
     """Response payload for AI-generated suggestions."""
     suggestion: str
     prompt: str
+
+
+class UpdateAssistModeRequest(BaseModel):
+    """Request payload for changing a chat's assist/autopilot mode."""
+    assist_mode: AssistMode
 
 

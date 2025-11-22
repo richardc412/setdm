@@ -15,6 +15,8 @@ import {
   Attendee,
   sendMessage,
   ignoreChat,
+  updateChatAssistMode,
+  AssistMode,
 } from "@/lib/api";
 import { realtimeClient, MessageEventPayload } from "@/lib/realtime";
 import { MessageList } from "@/components/MessageList";
@@ -209,6 +211,41 @@ export default function ChatsPage() {
     }
   };
 
+  const handleAssistModeChange = async (mode: AssistMode) => {
+    if (!selectedChat) return;
+    const chatId = selectedChat.id;
+    const previousMode = selectedChat.assist_mode;
+
+    // Optimistic update
+    setSelectedChat((prev) =>
+      prev && prev.id === chatId ? { ...prev, assist_mode: mode } : prev
+    );
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === chatId ? { ...chat, assist_mode: mode } : chat
+      )
+    );
+
+    try {
+      const updated = await updateChatAssistMode(chatId, mode);
+      setSelectedChat((prev) => (prev && prev.id === chatId ? updated : prev));
+      setChats((prev) =>
+        prev.map((chat) => (chat.id === chatId ? updated : chat))
+      );
+    } catch (error) {
+      // Revert optimistic update
+      setSelectedChat((prev) =>
+        prev && prev.id === chatId ? { ...prev, assist_mode: previousMode } : prev
+      );
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat.id === chatId ? { ...chat, assist_mode: previousMode } : chat
+        )
+      );
+      throw error;
+    }
+  };
+
   const handleSendMessage = async (text: string, attachments: File[]) => {
     if (!selectedChat) return;
 
@@ -338,15 +375,18 @@ export default function ChatsPage() {
           chatFound = true;
           const chat = prevChats[idx];
           const isActive = selectedChatRef.current?.id === payload.chat_id;
+          const isInbound = payload.is_sender === 0;
           const updatedChat: Chat = {
             ...chat,
             timestamp: payload.timestamp,
-            is_read: isActive ? true : false,
-            unread_count: isActive
-              ? 0
-              : (typeof chat.unread_count === "number"
-                  ? chat.unread_count
-                  : 0) + 1,
+            is_read: isInbound ? (isActive ? true : false) : chat.is_read,
+            unread_count: isInbound
+              ? isActive
+                ? 0
+                : (typeof chat.unread_count === "number"
+                    ? chat.unread_count
+                    : 0) + 1
+              : chat.unread_count,
           };
           const next = [...prevChats];
           next[idx] = updatedChat;
@@ -686,6 +726,8 @@ export default function ChatsPage() {
                       onSendMessage={handleSendMessage}
                       disabled={messagesLoading || selectedChat.is_ignored}
                       chatId={selectedChat.id}
+                      assistMode={selectedChat.assist_mode ?? "manual"}
+                      onAssistModeChange={handleAssistModeChange}
                     />
                   </>
                 )}

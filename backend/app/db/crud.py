@@ -61,6 +61,7 @@ async def get_or_create_chat(
             timestamp=chat_data.timestamp,
             unread_count=chat_data.unread_count,
             is_read=True,  # Default to read, will be updated during message sync
+            assist_mode="manual",
         )
         db.add(chat)
         await db.commit()
@@ -202,6 +203,28 @@ async def mark_chat_as_unread(
         chat.updated_at = datetime.utcnow()
         await db.commit()
         await db.refresh(chat)
+    return chat
+
+
+async def update_chat_assist_mode(
+    db: AsyncSession,
+    chat_id: str,
+    assist_mode: str,
+) -> Optional[ChatModel]:
+    """
+    Update the assist/autopilot mode for a chat.
+    """
+    chat = await get_chat_by_id(db, chat_id)
+    if not chat:
+        return None
+    
+    if chat.assist_mode == assist_mode:
+        return chat
+    
+    chat.assist_mode = assist_mode
+    chat.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(chat)
     return chat
 
 
@@ -391,6 +414,22 @@ async def get_messages_by_chat(
         .offset(offset)
     )
     return result.scalars().all()
+
+
+async def get_latest_message(
+    db: AsyncSession,
+    chat_id: str,
+) -> Optional[MessageModel]:
+    """
+    Get the most recent message in a chat.
+    """
+    result = await db.execute(
+        select(MessageModel)
+        .where(MessageModel.chat_id == chat_id)
+        .order_by(desc(MessageModel.timestamp))
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
 
 
 async def get_latest_message_timestamp(

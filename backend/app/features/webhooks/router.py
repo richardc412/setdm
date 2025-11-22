@@ -15,6 +15,7 @@ from app.db.crud import (
     get_chat_by_id,
 )
 from app.services.realtime import broadcast_new_message
+from app.services.autopilot import maybe_send_autopilot_reply
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +136,9 @@ async def process_webhook_message(db: AsyncSession, payload: WebhookMessagePaylo
         
         # Broadcast to realtime subscribers
         await broadcast_new_message(created_message)
+        
+        # Trigger Autopilot if enabled for this chat
+        await maybe_send_autopilot_reply(db, created_message)
     else:
         logger.info(f"Message {payload.message_id} already exists, skipping")
 
