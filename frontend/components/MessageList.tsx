@@ -194,17 +194,12 @@ export function MessageList({ messages, loading }: MessageListProps) {
                     )}
 
                     <div
-                      className={`max-w-[75%] ${
+                      className={`relative max-w-[75%] ${
                         isSender
                           ? "bg-slate-700 text-white"
                           : "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700"
                       } rounded-2xl px-4 py-2.5 shadow-md`}
                     >
-                      {message.sent_by_autopilot && (
-                        <span className="block text-[10px] uppercase tracking-wide text-amber-300 mb-1 text-right">
-                          Autopilot
-                        </span>
-                      )}
                       {/* Message text */}
                       {message.text && (
                         <p className="text-[15px] leading-snug whitespace-pre-wrap break-words">
@@ -233,6 +228,15 @@ export function MessageList({ messages, loading }: MessageListProps) {
                               {reaction.value}
                             </span>
                           ))}
+                        </div>
+                      )}
+                      {isSender && message.sent_by_autopilot && (
+                        <div className="absolute -bottom-3 -right-3 w-7 h-7 bg-white dark:bg-zinc-900 rounded-full flex items-center justify-center shadow-md border-2 border-white dark:border-zinc-900">
+                          <img
+                            src="/paper_airplane.svg"
+                            alt="Autopilot"
+                            className="w-4 h-4"
+                          />
                         </div>
                       )}
                     </div>
