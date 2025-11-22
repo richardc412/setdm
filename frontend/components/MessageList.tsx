@@ -1,3 +1,5 @@
+import { useMemo, useRef } from "react";
+
 import { Message } from "@/lib/api";
 
 interface MessageListProps {
@@ -6,6 +8,34 @@ interface MessageListProps {
 }
 
 export function MessageList({ messages, loading }: MessageListProps) {
+  const animatedMessageIds = useRef<Set<string>>(new Set());
+  const lastChatIdRef = useRef<string | null>(null);
+
+  const activeChatId = messages[0]?.chat_id ?? null;
+
+  if (!messages.length) {
+    animatedMessageIds.current.clear();
+    lastChatIdRef.current = null;
+  } else if (activeChatId && lastChatIdRef.current !== activeChatId) {
+    animatedMessageIds.current.clear();
+    lastChatIdRef.current = activeChatId;
+  }
+
+  const messageAnimations = useMemo(() => {
+    const animationMap = new Map<string, boolean>();
+
+    messages.forEach((message) => {
+      if (!animatedMessageIds.current.has(message.id)) {
+        animationMap.set(message.id, true);
+        animatedMessageIds.current.add(message.id);
+      } else {
+        animationMap.set(message.id, false);
+      }
+    });
+
+    return animationMap;
+  }, [messages]);
+
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString("en-US", {
@@ -175,11 +205,12 @@ export function MessageList({ messages, loading }: MessageListProps) {
             <div className="space-y-3">
               {dateMessages.map((message) => {
                 const isSender = message.is_sender === 1;
+                const shouldAnimate = messageAnimations.get(message.id);
 
                 return (
                   <div
                     key={message.id}
-                    className={`flex items-end gap-2 ${
+                    className={`flex items-end gap-2 transition-opacity duration-200 ${
                       isSender ? "justify-end" : "justify-start"
                     }`}
                   >
@@ -198,7 +229,9 @@ export function MessageList({ messages, loading }: MessageListProps) {
                         isSender
                           ? "bg-slate-700 text-white"
                           : "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700"
-                      } rounded-2xl px-4 py-2.5 shadow-md`}
+                      } rounded-2xl px-4 py-2.5 shadow-md transition-all duration-300 ease-out ${
+                        shouldAnimate ? "message-enter" : ""
+                      }`}
                     >
                       {/* Message text */}
                       {message.text && (
